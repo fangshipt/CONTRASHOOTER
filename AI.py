@@ -6,6 +6,115 @@ import random
 import csv
 import button
 import math
+import heapq
+
+def read_level_data(filename):
+    """
+    Đọc dữ liệu level từ file CSV.
+    Mỗi hàng trong file được chuyển thành một list số nguyên.
+    """
+    grid = []
+    with open(filename, newline="") as csvfile:
+        reader = csv.reader(csvfile, delimiter=",")
+        for row in reader:
+            grid.append([int(x) for x in row])
+    return grid
+
+def a_star(start, goal, grid):
+    """
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán A*.
+    
+    start, goal: tuple (x, y) thể hiện vị trí trên lưới (khối ô)
+    grid: ma trận level được đọc từ file CSV
+    Giả định: ô có giá trị -1 hoặc >= 9 là ô đi được,
+              ô có giá trị từ 0 đến 8 là chướng ngại vật.
+              
+    Trả về: danh sách các ô từ start đến goal (bao gồm cả start và goal)
+             hoặc None nếu không tìm được đường đi.
+    """
+    def get_neighbors(node):
+        x, y = node
+        neighbors = []
+        # Xét các hướng: trái, phải, lên, xuống
+        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < COLS and 0 <= ny < ROWS:
+                # Nếu ô là trống: (giá trị -1 hoặc >= 9) thì có thể đi qua
+                if grid[ny][nx] == -1 or grid[ny][nx] >= 9:
+                    neighbors.append((nx, ny))
+        return neighbors
+
+    open_set = set([start])
+    came_from = {}
+    g_score = {start: 0}
+    # Sử dụng khoảng cách Manhattan làm heuristic
+    f_score = {start: abs(goal[0]-start[0]) + abs(goal[1]-start[1])}
+
+    while open_set:
+        # Chọn nút có f_score thấp nhất
+        current = min(open_set, key=lambda node: f_score.get(node, float("inf")))
+        if current == goal:
+            # Tìm được đường: xây dựng lại path từ goal về start
+            path = [current]
+            while current in came_from:
+                current = came_from[current]
+                path.append(current)
+            path.reverse()
+            return path
+
+        open_set.remove(current)
+        for neighbor in get_neighbors(current):
+            tentative_g_score = g_score[current] + 1  # Mỗi bước cách nhau có chi phí = 1
+            if tentative_g_score < g_score.get(neighbor, float("inf")):
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                f_score[neighbor] = tentative_g_score + abs(goal[0]-neighbor[0]) + abs(goal[1]-neighbor[1])
+                if neighbor not in open_set:
+                    open_set.add(neighbor)
+    return None  
+
+def a_star(start, goal, grid):
+    """
+    start, goal: (x, y) trên lưới
+    grid: world_data hoặc ma trận với giá trị 0 (đi được) và 1 (chướng ngại vật)
+    Trả về danh sách các ô từ start đến goal
+    """
+    def get_neighbors(node):
+        x, y = node
+        neighbors = []
+        for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nx, ny = x+dx, y+dy
+            # Kiểm tra trong phạm vi và ô đó có đi được không (giả sử giá trị >=0 là đi được)
+            if 0 <= nx < COLS and 0 <= ny < ROWS and grid[ny][nx] < 9:  # Điều kiện có thể thay đổi tùy map của bạn
+                neighbors.append((nx, ny))
+        return neighbors
+
+    open_set = {start}
+    came_from = {}
+    g_score = {start: 0}
+    f_score = {start: abs(goal[0]-start[0]) + abs(goal[1]-start[1])}
+
+    while open_set:
+        current = min(open_set, key=lambda node: f_score.get(node, float("inf")))
+        if current == goal:
+            # Xây đường đi
+            path = [current]
+            while current in came_from:
+                current = came_from[current]
+                path.append(current)
+            path.reverse()
+            return path
+
+        open_set.remove(current)
+        for neighbor in get_neighbors(current):
+            tentative_g_score = g_score[current] + 1
+            if tentative_g_score < g_score.get(neighbor, float("inf")):
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                f_score[neighbor] = tentative_g_score + abs(goal[0]-neighbor[0]) + abs(goal[1]-neighbor[1])
+                if neighbor not in open_set:
+                    open_set.add(neighbor)
+    return None  # Không tìm được đường
 
 mixer.init()
 pygame.init()
@@ -30,17 +139,14 @@ screen_scroll = 0
 bg_scroll = 0
 level = 1
 
-# --- AI CODE ---
-# Thay vì chờ người chơi, ta để AI điều khiển.
-# Vẫn khai báo các biến này, nhưng sẽ được set trong hàm auto_control_player().
+start_game = False
+start_intro = False
+
 moving_left = False
 moving_right = False
 shoot = False
 grenade = False
 grenade_thrown = False
-
-start_game = False
-start_intro = False
 
 pygame.mixer.music.load("audio/music2.mp3")
 pygame.mixer.music.set_volume(0.3)
@@ -188,7 +294,6 @@ class Soldier(pygame.sprite.Sprite):
             self.vel_y
         dy += self.vel_y
 
-        # Xử lý va chạm tile
         for tile in world.obstacle_list:
             if tile[1].colliderect(self.rect.x + dx, self.rect.y, self.width, self.height):
                 dx = 0
@@ -205,20 +310,16 @@ class Soldier(pygame.sprite.Sprite):
                     self.in_air = False
                     dy = tile[1].top - self.rect.bottom
 
-        # Nước
         if pygame.sprite.spritecollide(self, water_group, False):
             self.health = 0
 
-        # Cửa ra
         level_complete = False
         if pygame.sprite.spritecollide(self, exit_group, False):
             level_complete = True
 
-        # Rơi khỏi map
         if self.rect.bottom > SCREEN_HEIGHT:
             self.health = 0
 
-        # Giữ player trong màn hình (nếu là player)
         if self.char_type == "player":
             if self.rect.left + dx < 0 or self.rect.right + dx > SCREEN_WIDTH:
                 dx = 0
@@ -226,7 +327,6 @@ class Soldier(pygame.sprite.Sprite):
         self.rect.x += dx
         self.rect.y += dy
 
-        # Cuộn màn hình
         if self.char_type == "player":
             if (self.rect.right > SCREEN_WIDTH - SCROLL_THRESH and bg_scroll < world.level_length * TILE_SIZE - SCREEN_WIDTH) \
                or (self.rect.left < SCROLL_THRESH and bg_scroll > abs(dx)):
@@ -244,46 +344,55 @@ class Soldier(pygame.sprite.Sprite):
             shot_fx.play()
 
     def ai(self):
-        # AI của địch (đã có sẵn)
-        if self.alive and player.alive:
-            if self.idling == False and random.randint(1, 200) == 1:
-                self.update_action(0)
-                self.idling = True
-            if self.vision.colliderect(player.rect):
-                self.update_action(0)
-                self.shoot()
+        if not self.alive or not player.alive:
+            return
+
+        # 1. Xác định vị trí hiện tại của enemy và player theo cell (ô trên lưới)
+        start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
+        goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
+        
+        # 2. Gọi hàm A* để tìm đường đi từ enemy đến player
+        path = a_star(start, goal, world_data)
+        
+        if path and len(path) > 1:
+            # Lấy ô tiếp theo trong đường đi
+            next_cell = path[1]
+            target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
+            target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
+
+            # 3. Nếu ô tiếp theo nằm cao hơn (cần nhảy lên)
+            if target_y < self.rect.centery and not self.in_air:
+                self.jump = True  # kích hoạt nhảy
+
+            # 4. Di chuyển theo hướng horizontal
+            if self.rect.centerx < target_x:
+                self.move(moving_left=False, moving_right=True)
+                self.direction = 1
+            elif self.rect.centerx > target_x:
+                self.move(moving_left=True, moving_right=False)
+                self.direction = -1
             else:
+                self.move(moving_left=False, moving_right=False)
+                
+            # Cập nhật vùng "vision" theo hướng di chuyển
+            self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
+            
+            # Nếu player nằm trong vùng "vision", enemy sẽ bắn và có thể ném lựu
+            if self.vision.colliderect(player.rect):
+                self.shoot()  # Lưu ý: với enemy, bạn có thể cài đặt shoot() sao cho không giảm số đạn
                 now_time = pygame.time.get_ticks()
-                dist = math.sqrt((abs(self.rect.centerx - player.rect.centerx))**2 + (abs(self.rect.centery - player.rect.centery))**2)
-                # Quăng lựu đạn nếu ở gần
-                if dist < TILE_SIZE * 5:
-                    if self.grenades > 0:
-                        if now_time - self.grenade_time > random.randint(2000, 3000):
-                            self.update_action(0)
-                            self.grenade_time = pygame.time.get_ticks()
-                            grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
-                            grenade_group.add(grenade_)
-                            self.grenades -= 1
+                dist = math.hypot(self.rect.centerx - player.rect.centerx, self.rect.centery - player.rect.centery)
+                if dist < TILE_SIZE * 5 and self.grenades > 0:
+                    if now_time - self.grenade_time > random.randint(2000, 3000):
+                        grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
+                        grenade_group.add(grenade_)
+                        self.grenade_time = now_time
+                        self.grenades -= 1
+        else:
+            # Nếu không tìm được đường, enemy có thể đứng yên hoặc di chuyển ngẫu nhiên
+            self.move(moving_left=False, moving_right=False)
 
-                if self.idling == False:
-                    if self.direction == 1:
-                        ai_moving_right = True
-                        self.idling_counter = 50
-                    else:
-                        ai_moving_right = False
-                    ai_moving_left = not ai_moving_right
-                    self.move(ai_moving_left, ai_moving_right)
-                    self.update_action(1)
-                    self.move_counter += 1
-                    self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
-                    if self.move_counter > TILE_SIZE:
-                        self.direction *= -1
-                        self.move_counter *= -1
-                else:
-                    self.idling_counter -= 1
-                    if self.idling_counter <= 0:
-                        self.idling = False
-
+        # Điều chỉnh vị trí enemy theo screen_scroll (nếu có)
         self.rect.x += screen_scroll
 
     def update_animation(self):
@@ -385,7 +494,6 @@ class Grenade(pygame.sprite.Sprite):
         self.direction = direction
         self.width = self.image.get_width()
         self.height = self.image.get_height()
-        self.in_air = True  # Thêm cờ này để tránh spam logic
 
     def update(self):
         self.vel_y += GRAVITY
@@ -578,64 +686,18 @@ with open(f"level{level}_data.csv", newline="") as csvfile:
 world = World()
 player, health_bar = world.process_data(world_data)
 
-
-# --- AI CODE ---
-def auto_control_player(player, enemy_group, world):
-    """
-    Hàm AI đơn giản:
-    1) Luôn di chuyển sang phải
-    2) Nếu thấy enemy đủ gần, bắn
-    3) Nếu sắp đụng obstacle, nhảy
-    4) Ngẫu nhiên ném lựu đạn
-    """
-    global moving_left, moving_right, shoot, grenade, grenade_thrown
-
-    # Mặc định
-    moving_left = False
-    moving_right = True
-    shoot = False
-    grenade = False
-
-    # 1) Kiểm tra khoảng cách enemy
-    for enemy in enemy_group:
-        dist_x = abs(enemy.rect.centerx - player.rect.centerx)
-        # Nếu enemy ở phía trước và đủ gần thì bắn
-        if enemy.rect.centerx > player.rect.centerx and dist_x < 300:
-            shoot = True
-            break  # bắn 1 thằng thôi, tránh bị override
-
-    # 2) Nếu sắp đụng obstacle ngay trước mặt, thì nhảy
-    #    Ta quét 1 hình chữ nhật nhỏ phía trước player.
-    #    Nếu rect đó va chạm tile -> nhảy
-    player_ahead_rect = pygame.Rect(
-        player.rect.x + 20 * player.direction,  # một chút phía trước
-        player.rect.y,
-        player.width,
-        player.height
-    )
-    for tile in world.obstacle_list:
-        if tile[1].colliderect(player_ahead_rect):
-            if not player.in_air:
-                player.jump = True
-            break
-
-    # 3) Ngẫu nhiên ném lựu đạn cho vui (tỷ lệ 1/300 mỗi frame)
-    if random.randint(1, 300) == 1 and player.grenades > 0:
-        grenade = True
-        grenade_thrown = False
-
-
 run = True
 while run:
     clock.tick(FPS)
 
-    if not start_game:
+    if start_game == False:
         screen.fill(BG)
         if start_button.draw(screen):
             start_game = True
             start_intro = True
         if exit_button.draw(screen):
             run = False
+
     else:
         draw_bg()
         world.draw()
@@ -671,18 +733,12 @@ while run:
         water_group.draw(screen)
         exit_group.draw(screen)
 
-        # Hiệu ứng fade intro
         if start_intro:
             if intro_fade.fade():
                 start_intro = False
                 intro_fade.fade_counter = 0
 
-        # --- AI CODE ---
-        # Gọi hàm auto_control_player để set moving_left, moving_right, shoot, grenade
         if player.alive:
-            auto_control_player(player, enemy_group, world)
-
-            # Xử lý bắn và ném lựu đạn theo cờ AI
             if shoot:
                 player.shoot()
             elif grenade and grenade_thrown == False and player.grenades > 0:
@@ -692,13 +748,12 @@ while run:
                 player.grenades -= 1
                 grenade_thrown = True
 
-            # Chọn animation
             if player.in_air:
-                player.update_action(2)  # Jump
+                player.update_action(2)
             elif moving_left or moving_right:
-                player.update_action(1)  # Run
+                player.update_action(1)
             else:
-                player.update_action(0)  # Idle
+                player.update_action(0)
 
             screen_scroll, level_complete = player.move(moving_left, moving_right)
             bg_scroll -= screen_scroll
@@ -719,7 +774,6 @@ while run:
                     player, health_bar = world.process_data(world_data)
 
         else:
-            # Player chết
             screen_scroll = 0
             if death_fade.fade():
                 if restart_button.draw(screen):
@@ -736,18 +790,34 @@ while run:
                     world = World()
                     player, health_bar = world.process_data(world_data)
 
-    # ---
-    # Đoạn này ta *tắt* bắt phím để game tự chơi.
-    # Nếu muốn ESC thoát, bạn có thể giữ lại 1 nút thoát.
-    # ---
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
             pygame.quit()
             sys.exit()
-        # Giữ lại ESC để thoát
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_a:
+                moving_left = True
+            if event.key == pygame.K_d:
+                moving_right = True
+            if event.key == pygame.K_SPACE:
+                shoot = True
+            if event.key == pygame.K_q:
+                grenade = True
+            if event.key == pygame.K_w and player.alive:
+                player.jump = True
+                jump_fx.play()
             if event.key == pygame.K_ESCAPE:
                 run = False
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_a:
+                moving_left = False
+            if event.key == pygame.K_d:
+                moving_right = False
+            if event.key == pygame.K_SPACE:
+                shoot = False
+            if event.key == pygame.K_q:
+                grenade = False
+                grenade_thrown = False
 
     pygame.display.update()
