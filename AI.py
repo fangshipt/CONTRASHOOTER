@@ -73,48 +73,7 @@ def a_star(start, goal, grid):
                     open_set.add(neighbor)
     return None  
 
-def a_star(start, goal, grid):
-    """
-    start, goal: (x, y) trên lưới
-    grid: world_data hoặc ma trận với giá trị 0 (đi được) và 1 (chướng ngại vật)
-    Trả về danh sách các ô từ start đến goal
-    """
-    def get_neighbors(node):
-        x, y = node
-        neighbors = []
-        for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
-            nx, ny = x+dx, y+dy
-            # Kiểm tra trong phạm vi và ô đó có đi được không (giả sử giá trị >=0 là đi được)
-            if 0 <= nx < COLS and 0 <= ny < ROWS and grid[ny][nx] < 9:  # Điều kiện có thể thay đổi tùy map của bạn
-                neighbors.append((nx, ny))
-        return neighbors
 
-    open_set = {start}
-    came_from = {}
-    g_score = {start: 0}
-    f_score = {start: abs(goal[0]-start[0]) + abs(goal[1]-start[1])}
-
-    while open_set:
-        current = min(open_set, key=lambda node: f_score.get(node, float("inf")))
-        if current == goal:
-            # Xây đường đi
-            path = [current]
-            while current in came_from:
-                current = came_from[current]
-                path.append(current)
-            path.reverse()
-            return path
-
-        open_set.remove(current)
-        for neighbor in get_neighbors(current):
-            tentative_g_score = g_score[current] + 1
-            if tentative_g_score < g_score.get(neighbor, float("inf")):
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = tentative_g_score + abs(goal[0]-neighbor[0]) + abs(goal[1]-neighbor[1])
-                if neighbor not in open_set:
-                    open_set.add(neighbor)
-    return None  # Không tìm được đường
 
 mixer.init()
 pygame.init()
