@@ -187,6 +187,7 @@ class Soldier(pygame.sprite.Sprite):
         self.alive = True
         self.char_type = char_type
         self.speed = speed
+        self.chasing = False
         self.ammo = ammo
         self.start_ammo = ammo
         self.shoot_cooldown = 0
@@ -311,53 +312,63 @@ class Soldier(pygame.sprite.Sprite):
         if not self.alive or not player.alive:
             return
 
-        # 1. Xác định vị trí hiện tại của enemy và player theo cell (ô trên lưới)
-        start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
-        goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-        
-        # 2. Gọi hàm A* để tìm đường đi từ enemy đến player
-        path = a_star(start, goal, world_data)
-        
-        if path and len(path) > 1:
-            # Lấy ô tiếp theo trong đường đi
-            next_cell = path[1]
-            target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
-            target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
+        # Xác định khoảng cách giữa enemy và player
+        distance_to_player = math.hypot(self.rect.centerx - player.rect.centerx, self.rect.centery - player.rect.centery)
+        VISION_RANGE = TILE_SIZE * 6  # Phạm vi để bắt đầu đuổi theo
 
-            # 3. Nếu ô tiếp theo nằm cao hơn (cần nhảy lên)
-            if target_y < self.rect.centery and not self.in_air:
-                self.jump = True  # kích hoạt nhảy
+        # Nếu player vào phạm vi, kích hoạt chế độ đuổi theo
+        if distance_to_player <= VISION_RANGE:
+            self.chasing = True  # Sau khi kích hoạt, enemy sẽ luôn đuổi theo player
 
-            # 4. Di chuyển theo hướng horizontal
-            if self.rect.centerx < target_x:
-                self.move(moving_left=False, moving_right=True)
-                self.direction = 1
-            elif self.rect.centerx > target_x:
-                self.move(moving_left=True, moving_right=False)
-                self.direction = -1
-            else:
-                self.move(moving_left=False, moving_right=False)
-                
-            # Cập nhật vùng "vision" theo hướng di chuyển
-            self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
+        # Nếu đang đuổi theo, luôn dùng A* để tìm đường đến player
+        if self.chasing:
+            # 1. Xác định vị trí hiện tại của enemy và player theo cell (ô trên lưới)
+            start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
+            goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
             
-            # Nếu player nằm trong vùng "vision", enemy sẽ bắn và có thể ném lựu
-            if self.vision.colliderect(player.rect):
-                self.shoot()  # Lưu ý: với enemy, bạn có thể cài đặt shoot() sao cho không giảm số đạn
-                now_time = pygame.time.get_ticks()
-                dist = math.hypot(self.rect.centerx - player.rect.centerx, self.rect.centery - player.rect.centery)
-                if dist < TILE_SIZE * 5 and self.grenades > 0:
-                    if now_time - self.grenade_time > random.randint(2000, 3000):
-                        grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
-                        grenade_group.add(grenade_)
-                        self.grenade_time = now_time
-                        self.grenades -= 1
-        else:
-            # Nếu không tìm được đường, enemy có thể đứng yên hoặc di chuyển ngẫu nhiên
-            self.move(moving_left=False, moving_right=False)
+            # 2. Gọi hàm A* để tìm đường đi từ enemy đến player
+            path = a_star(start, goal, world_data)
+            
+            if path and len(path) > 1:
+                # Lấy ô tiếp theo trong đường đi
+                next_cell = path[1]
+                target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
+                target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
+
+                # 3. Nếu ô tiếp theo nằm cao hơn (cần nhảy lên)
+                if target_y < self.rect.centery and not self.in_air:
+                    self.jump = True  # kích hoạt nhảy
+
+                # 4. Di chuyển theo hướng horizontal
+                if self.rect.centerx < target_x:
+                    self.move(moving_left=False, moving_right=True)
+                    self.direction = 1
+                elif self.rect.centerx > target_x:
+                    self.move(moving_left=True, moving_right=False)
+                    self.direction = -1
+                else:
+                    self.move(moving_left=False, moving_right=False)
+                    
+                # Cập nhật vùng "vision" theo hướng di chuyển
+                self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
+                
+                # Nếu player nằm trong vùng "vision", enemy sẽ bắn và có thể ném lựu
+                if self.vision.colliderect(player.rect):
+                    self.shoot()
+                    now_time = pygame.time.get_ticks()
+                    if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
+                        if now_time - self.grenade_time > random.randint(2000, 3000):
+                            grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
+                            grenade_group.add(grenade_)
+                            self.grenade_time = now_time
+                            self.grenades -= 1
+            else:
+                # Nếu không tìm được đường, enemy có thể đứng yên hoặc tuần tra
+                self.move(moving_left=False, moving_right=False)
 
         # Điều chỉnh vị trí enemy theo screen_scroll (nếu có)
         self.rect.x += screen_scroll
+
 
     def update_animation(self):
         ANIMATION_COOLDOWN = 100
