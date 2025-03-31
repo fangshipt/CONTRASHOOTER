@@ -20,41 +20,111 @@ def read_level_data(filename):
             grid.append([int(x) for x in row])
     return grid
 
+def is_safe(x, y, grid):
+    """
+    Kiểm tra ô (x,y) có an toàn để đi qua hay không.
+    An toàn nếu:
+      - Giá trị ô không phải là nước (9,10)
+      - Nếu ô nằm ở hàng cuối (y == ROWS-1), thì giá trị không được là -1 (pit)
+    """
+    val = grid[y][x]
+    if val in (9, 10):
+        return False
+    if y == ROWS - 1 and val == -1:
+        return False
+    return True
+
 def a_star(start, goal, grid):
     """
     Tìm đường đi từ start đến goal trong grid bằng thuật toán A*.
-    
-    start, goal: tuple (x, y) thể hiện vị trí trên lưới (khối ô)
-    grid: ma trận level được đọc từ file CSV
-    Giả định: ô có giá trị -1 hoặc >= 9 là ô đi được,
-              ô có giá trị từ 0 đến 8 là chướng ngại vật.
-              
-    Trả về: danh sách các ô từ start đến goal (bao gồm cả start và goal)
-             hoặc None nếu không tìm được đường đi.
+    Cho phép di chuyển theo cả 2 hướng:
+      - Di chuyển “bình thường” theo hàng ngang và dọc với bước = 1 ô.
+      - Di chuyển “nhảy” xa: xét các bước nhảy theo hàng ngang và dọc (tối đa 4 ô).
+        Trong trường hợp nhảy, các ô trung gian phải là ô nguy hiểm (không an toàn)
+        và ô hạ cánh phải an toàn.
+    Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
     """
     def get_neighbors(node):
         x, y = node
         neighbors = []
-        # Xét các hướng: trái, phải, lên, xuống
-        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < COLS and 0 <= ny < ROWS:
-                # Nếu ô là trống: (giá trị -1 hoặc >= 9) thì có thể đi qua
-                if grid[ny][nx] == -1 or grid[ny][nx] >= 9:
-                    neighbors.append((nx, ny))
+
+        # Hướng ngang: sang phải và sang trái
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
+            candidate_x = x + dx
+            if candidate_x >= COLS:
+                break
+            if dx == 1:
+                # Di chuyển liền kề
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                # Với bước nhảy xa: các ô trung gian phải không an toàn (nguy hiểm)
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x + step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
+            candidate_x = x - dx
+            if candidate_x < 0:
+                break
+            if dx == 1:
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x - step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+                    
+        # Hướng dọc: xuống và lên
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
+            candidate_y = y + dy
+            if candidate_y >= ROWS:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y + step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
+            candidate_y = y - dy
+            if candidate_y < 0:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y - step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
         return neighbors
 
     open_set = set([start])
     came_from = {}
     g_score = {start: 0}
     # Sử dụng khoảng cách Manhattan làm heuristic
-    f_score = {start: abs(goal[0]-start[0]) + abs(goal[1]-start[1])}
+    f_score = {start: abs(goal[0] - start[0]) + abs(goal[1] - start[1])}
 
     while open_set:
-        # Chọn nút có f_score thấp nhất
         current = min(open_set, key=lambda node: f_score.get(node, float("inf")))
         if current == goal:
-            # Tìm được đường: xây dựng lại path từ goal về start
+            # Xây dựng lại đường đi từ goal về start
             path = [current]
             while current in came_from:
                 current = came_from[current]
@@ -64,14 +134,20 @@ def a_star(start, goal, grid):
 
         open_set.remove(current)
         for neighbor in get_neighbors(current):
-            tentative_g_score = g_score[current] + 1  # Mỗi bước cách nhau có chi phí = 1
+            # Tính chi phí di chuyển:
+            # Nếu di chuyển liền kề thì chi phí = 1, nếu là nhảy xa thì chi phí = khoảng cách (số ô)
+            dx = abs(neighbor[0] - current[0])
+            dy = abs(neighbor[1] - current[1])
+            move_cost = dx if dx > dy else dy  # vì chỉ di chuyển theo hàng ngang hoặc dọc
+            if move_cost == 0:
+                move_cost = 1
+            tentative_g_score = g_score[current] + move_cost
             if tentative_g_score < g_score.get(neighbor, float("inf")):
                 came_from[neighbor] = current
                 g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = tentative_g_score + abs(goal[0]-neighbor[0]) + abs(goal[1]-neighbor[1])
-                if neighbor not in open_set:
-                    open_set.add(neighbor)
-    return None  
+                f_score[neighbor] = tentative_g_score + abs(goal[0] - neighbor[0]) + abs(goal[1] - neighbor[1])
+                open_set.add(neighbor)
+    return None
 
 
 mixer.init()
@@ -187,6 +263,7 @@ class Soldier(pygame.sprite.Sprite):
         self.alive = True
         self.char_type = char_type
         self.speed = speed
+        self.chasing = False
         self.ammo = ammo
         self.start_ammo = ammo
         self.shoot_cooldown = 0
@@ -308,56 +385,73 @@ class Soldier(pygame.sprite.Sprite):
             shot_fx.play()
 
     def ai(self):
+        # Kiểm tra trạng thái sống của enemy và player
         if not self.alive or not player.alive:
             return
 
-        # 1. Xác định vị trí hiện tại của enemy và player theo cell (ô trên lưới)
-        start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
-        goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-        
-        # 2. Gọi hàm A* để tìm đường đi từ enemy đến player
-        path = a_star(start, goal, world_data)
-        
-        if path and len(path) > 1:
-            # Lấy ô tiếp theo trong đường đi
-            next_cell = path[1]
-            target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
-            target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
+        # Tính khoảng cách giữa enemy và player (theo pixel)
+        distance_to_player = math.hypot(self.rect.centerx - player.rect.centerx,
+                                        self.rect.centery - player.rect.centery)
+        VISION_RANGE = TILE_SIZE * 6  # Phạm vi để kích hoạt chế độ đuổi theo
 
-            # 3. Nếu ô tiếp theo nằm cao hơn (cần nhảy lên)
-            if target_y < self.rect.centery and not self.in_air:
-                self.jump = True  # kích hoạt nhảy
+        # Nếu player nằm trong phạm vi, bật chế độ đuổi theo
+        if distance_to_player <= VISION_RANGE:
+            self.chasing = True
 
-            # 4. Di chuyển theo hướng horizontal
-            if self.rect.centerx < target_x:
-                self.move(moving_left=False, moving_right=True)
-                self.direction = 1
-            elif self.rect.centerx > target_x:
-                self.move(moving_left=True, moving_right=False)
-                self.direction = -1
-            else:
-                self.move(moving_left=False, moving_right=False)
-                
-            # Cập nhật vùng "vision" theo hướng di chuyển
-            self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
+        # Nếu đang trong chế độ đuổi theo, sử dụng A* để tìm đường đi
+        if self.chasing:
+            # Xác định vị trí hiện tại của enemy và player theo ô trên lưới
+            start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
+            goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
             
-            # Nếu player nằm trong vùng "vision", enemy sẽ bắn và có thể ném lựu
-            if self.vision.colliderect(player.rect):
-                self.shoot()  # Lưu ý: với enemy, bạn có thể cài đặt shoot() sao cho không giảm số đạn
-                now_time = pygame.time.get_ticks()
-                dist = math.hypot(self.rect.centerx - player.rect.centerx, self.rect.centery - player.rect.centery)
-                if dist < TILE_SIZE * 5 and self.grenades > 0:
-                    if now_time - self.grenade_time > random.randint(2000, 3000):
-                        grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
-                        grenade_group.add(grenade_)
-                        self.grenade_time = now_time
-                        self.grenades -= 1
-        else:
-            # Nếu không tìm được đường, enemy có thể đứng yên hoặc di chuyển ngẫu nhiên
-            self.move(moving_left=False, moving_right=False)
+            # Gọi hàm A* để tìm đường đi
+            path = a_star(start, goal, world_data)
+            
+            if path and len(path) > 1:
+                # Lấy ô tiếp theo trong đường đi
+                next_cell = path[1]
+                target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
+                target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
 
-        # Điều chỉnh vị trí enemy theo screen_scroll (nếu có)
+                # Xét xem nước đi này có phải là nước nhảy xa hay không
+                # Nếu ô kế tiếp cách xa hơn 1 ô so với ô hiện tại, thì xem đây là hành động nhảy.
+                if abs(next_cell[0] - start[0]) > 1 or abs(next_cell[1] - start[1]) > 1:
+                    self.jump = True
+                # Nếu ô kế tiếp cao hơn vị trí hiện tại và enemy không đang trong không trung, cũng kích hoạt nhảy.
+                elif target_y < self.rect.centery and not self.in_air:
+                    self.jump = True
+
+                # Di chuyển theo hướng phù hợp (chỉ xét theo trục ngang ở đây, có thể mở rộng cho dọc nếu cần)
+                if self.rect.centerx < target_x:
+                    self.move(moving_left=False, moving_right=True)
+                    self.direction = 1
+                elif self.rect.centerx > target_x:
+                    self.move(moving_left=True, moving_right=False)
+                    self.direction = -1
+                else:
+                    self.move(moving_left=False, moving_right=False)
+                    
+                # Cập nhật vùng "vision" theo hướng di chuyển hiện tại
+                self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
+                
+                # Nếu player nằm trong vùng "vision", enemy sẽ bắn và có thể ném lựu nếu đủ gần
+                if self.vision.colliderect(player.rect):
+                    self.shoot()
+                    now_time = pygame.time.get_ticks()
+                    if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
+                        if now_time - self.grenade_time > random.randint(2000, 3000):
+                            grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
+                            grenade_group.add(grenade_)
+                            self.grenade_time = now_time
+                            self.grenades -= 1
+            else:
+                # Nếu không tìm được đường, enemy đứng yên (hoặc có thể thực hiện hành động khác như tuần tra)
+                self.move(moving_left=False, moving_right=False)
+        
+        # Điều chỉnh vị trí enemy theo screen_scroll
         self.rect.x += screen_scroll
+
+
 
     def update_animation(self):
         ANIMATION_COOLDOWN = 100
