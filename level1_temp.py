@@ -388,70 +388,78 @@ class Soldier(pygame.sprite.Sprite):
             shot_fx.play()
 
     def ai(self):
-        # Kiểm tra trạng thái sống của enemy và player
+        # Nếu enemy hay player không sống thì không xử lý ai
         if not self.alive or not player.alive:
             return
 
         # Tính khoảng cách giữa enemy và player (theo pixel)
         distance_to_player = math.hypot(self.rect.centerx - player.rect.centerx,
                                         self.rect.centery - player.rect.centery)
-        VISION_RANGE = TILE_SIZE * 6  # Phạm vi để kích hoạt chế độ đuổi theo
+        VISION_RANGE = TILE_SIZE * 6  # Phạm vi kích hoạt chế độ đuổi theo
+        moving = False  # Biến dùng để đánh dấu trạng thái di chuyển
 
-        # Nếu player nằm trong phạm vi, bật chế độ đuổi theo
+        # Nếu player trong tầm nhìn, bật chế độ đuổi theo
         if distance_to_player <= VISION_RANGE:
             self.chasing = True
 
-        # Nếu đang trong chế độ đuổi theo, sử dụng A* để tìm đường đi
         if self.chasing:
-            # Xác định vị trí hiện tại của enemy và player theo ô trên lưới
+            # Xác định vị trí enemy và player theo hệ tọa độ lưới
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
             goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
             
-            # Gọi hàm A* để tìm đường đi
+            # Tìm đường đi từ enemy đến player bằng thuật toán A*
             path = a_star(start, goal, world_data)
             
             if path and len(path) > 1:
-                # Lấy ô tiếp theo trong đường đi
+                # Lấy ô tiếp theo trên đường đi
                 next_cell = path[1]
                 target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
                 target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
 
-                # Xét xem nước đi này có phải là nước nhảy xa hay không
-                # Nếu ô kế tiếp cách xa hơn 1 ô so với ô hiện tại, thì xem đây là hành động nhảy.
+                # Kiểm tra xem cần nhảy hay không (nếu ô kế tiếp cách xa hơn 1 ô hoặc cao hơn)
                 if abs(next_cell[0] - start[0]) > 1 or abs(next_cell[1] - start[1]) > 1:
                     self.jump = True
-                # Nếu ô kế tiếp cao hơn vị trí hiện tại và enemy không đang trong không trung, cũng kích hoạt nhảy.
                 elif target_y < self.rect.centery and not self.in_air:
                     self.jump = True
 
-                # Di chuyển theo hướng phù hợp (chỉ xét theo trục ngang ở đây, có thể mở rộng cho dọc nếu cần)
+                # Di chuyển theo hướng hợp lý dựa trên vị trí target_x
                 if self.rect.centerx < target_x:
                     self.move(moving_left=False, moving_right=True)
                     self.direction = 1
+                    moving = True
                 elif self.rect.centerx > target_x:
                     self.move(moving_left=True, moving_right=False)
                     self.direction = -1
+                    moving = True
                 else:
                     self.move(moving_left=False, moving_right=False)
-                    
-                # Cập nhật vùng "vision" theo hướng di chuyển hiện tại
+
+                # Cập nhật vị trí vùng "vision"
                 self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
-                
-                # Nếu player nằm trong vùng "vision", enemy sẽ bắn và có thể ném lựu nếu đủ gần
+
+                # Nếu player nằm trong vùng tầm nhìn, enemy sẽ bắn và có thể ném lựu
                 if self.vision.colliderect(player.rect):
                     self.shoot()
-                    now_time = pygame.time.get_ticks()
-                    if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
-                        if now_time - self.grenade_time > random.randint(2000, 3000):
-                            grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
-                            grenade_group.add(grenade_)
-                            self.grenade_time = now_time
-                            self.grenades -= 1
+                    
             else:
-                # Nếu không tìm được đường, enemy đứng yên (hoặc có thể thực hiện hành động khác như tuần tra)
+                # Nếu không tìm được đường, enemy đứng yên hoặc thực hiện hành động khác (như tuần tra)
                 self.move(moving_left=False, moving_right=False)
-        
-        # Điều chỉnh vị trí enemy theo screen_scroll
+        else:
+            # Nếu chưa kích hoạt chế độ đuổi theo, enemy đứng yên
+            self.move(moving_left=False, moving_right=False)
+
+        # --- CẬP NHẬT TRẠNG THÁI ANIMATION ---
+        if self.in_air:
+            # Nếu enemy đang bay (nhảy)
+            self.update_action(2)
+        elif moving:
+            # Nếu enemy đang di chuyển (chạy)
+            self.update_action(1)
+        else:
+            # Nếu enemy đứng yên
+            self.update_action(0)
+
+        # Điều chỉnh vị trí theo screen_scroll (nếu có)
         self.rect.x += screen_scroll
 
 
@@ -607,14 +615,15 @@ class World():
                     img_rect.x = x * TILE_SIZE
                     img_rect.y = y * TILE_SIZE
                     tile_data = (img, img_rect)
-                    if tile >= 0 and tile <= 8:
+                    if (tile >= 0 and tile <= 8) or tile == 12:
                         self.obstacle_list.append(tile_data)
                     elif tile >= 9 and tile <= 10:
                         water = Water(img, x * TILE_SIZE, y * TILE_SIZE)
                         water_group.add(water)
-                    elif tile >= 11 and tile <= 14:
+                    elif tile in [11, 13, 14]:
                         decoration = Decoration(img, x * TILE_SIZE, y * TILE_SIZE)
                         decoration_group.add(decoration)
+
                     elif tile == 15:
                         player = Soldier("player", x * TILE_SIZE, y * TILE_SIZE, 1.65, 5, 20, 5)
                         health_bar = HealthBar(10, 10, player.health, player.health)
