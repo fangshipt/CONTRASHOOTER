@@ -171,7 +171,7 @@ TILE_TYPES = 21
 MAX_LEVELS = 3
 screen_scroll = 0
 bg_scroll = 0
-level = 2
+level = 1
 
 start_game = False
 start_intro = False
