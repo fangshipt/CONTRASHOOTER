@@ -317,6 +317,7 @@ class Soldier(pygame.sprite.Sprite):
         dx = 0
         dy = 0
 
+        # Xác định hướng di chuyển dựa vào điều khiển
         if moving_left:
             dx = -self.speed
             self.flip = True
@@ -325,52 +326,72 @@ class Soldier(pygame.sprite.Sprite):
             dx = self.speed
             self.flip = False
             self.direction = 1
-        if self.jump and self.in_air == False:
-            self.vel_y = -11
+
+        # Xử lý nhảy: chỉ cho phép nhảy khi chưa trong không trung (in_air == False)
+        if self.jump and not self.in_air:
+            if self.char_type == "enemy":
+                self.vel_y = -13  # Lực nhảy của enemy cao hơn một chút
+            else:
+                self.vel_y = -11
             self.jump = False
             self.in_air = True
 
+        # Áp dụng trọng lực (GRAVITY) và giới hạn tốc độ rơi tối đa là 10
         self.vel_y += GRAVITY
         if self.vel_y > 10:
-            self.vel_y
+            self.vel_y = 10
         dy += self.vel_y
 
+        # Kiểm tra va chạm với các tile trong world.obstacle_list
         for tile in world.obstacle_list:
+            # Kiểm tra va chạm theo chiều ngang
             if tile[1].colliderect(self.rect.x + dx, self.rect.y, self.width, self.height):
                 dx = 0
                 if self.char_type == "enemy":
-                    self.direction *= -1
+                    self.direction *= -1  # Đảo hướng cho enemy khi chạm tường
                     self.move_counter = 0
 
+            # Kiểm tra va chạm theo chiều dọc
             if tile[1].colliderect(self.rect.x, self.rect.y + dy, self.width, self.height):
                 if self.vel_y < 0:
                     self.vel_y = 0
-                    dy = tile[1].bottom - self.rect.top
+                    dy = tile[1].bottom - self.rect.top  # Điều chỉnh khi va chạm khi nhảy lên
                 elif self.vel_y >= 0:
                     self.vel_y = 0
-                    self.in_air = False
-                    dy = tile[1].top - self.rect.bottom
+                    self.in_air = False  # Đánh dấu đã tiếp đất
+                    dy = tile[1].top - self.rect.bottom  # Điều chỉnh khi va chạm khi rơi xuống
 
+        # Kiểm tra va chạm với nước: nếu chạm nước thì set health = 0
         if pygame.sprite.spritecollide(self, water_group, False):
             self.health = 0
 
+        # Xác định level complete nếu sprite chạm exit
         level_complete = False
         if pygame.sprite.spritecollide(self, exit_group, False):
             level_complete = True
 
+        # Nếu sprite rơi khỏi dưới màn hình thì set health = 0
         if self.rect.bottom > SCREEN_HEIGHT:
             self.health = 0
 
+        # Với player: giữ sprite trong khung màn hình
         if self.char_type == "player":
             if self.rect.left + dx < 0 or self.rect.right + dx > SCREEN_WIDTH:
                 dx = 0
 
+        # Với enemy: tăng tốc độ theo trục ngang (chạy nhanh hơn một chút)
+        if self.char_type == "enemy":
+            dx *= 1.5
+
+        # Cập nhật vị trí của sprite
         self.rect.x += dx
         self.rect.y += dy
 
+        # Với player, điều chỉnh background (scroll) nếu sprite chạm ngưỡng cuộn màn hình
         if self.char_type == "player":
-            if (self.rect.right > SCREEN_WIDTH - SCROLL_THRESH and bg_scroll < world.level_length * TILE_SIZE - SCREEN_WIDTH) \
-               or (self.rect.left < SCROLL_THRESH and bg_scroll > abs(dx)):
+            if (self.rect.right > SCREEN_WIDTH - SCROLL_THRESH and 
+                bg_scroll < world.level_length * TILE_SIZE - SCREEN_WIDTH) or \
+            (self.rect.left < SCROLL_THRESH and bg_scroll > abs(dx)):
                 self.rect.x -= dx
                 screen_scroll = -dx
 
