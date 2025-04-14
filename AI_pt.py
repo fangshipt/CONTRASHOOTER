@@ -377,11 +377,14 @@ class Soldier(pygame.sprite.Sprite):
         return screen_scroll, level_complete
 
     def shoot(self):
-        if self.shoot_cooldown == 0 and self.ammo > 0:
+        if self.shoot_cooldown == 0:
             self.shoot_cooldown = 20
-            bullet = Bullet(self.rect.centerx + (0.75 * self.rect.size[0] * self.direction), self.rect.centery, self.direction)
+            bullet = Bullet(self.rect.centerx + (0.75 * self.rect.size[0] * self.direction), 
+                            self.rect.centery, self.direction)
             bullet_group.add(bullet)
-            self.ammo -= 1
+            # Nếu là player thì giảm số đạn, enemy có đạn vô cực
+            if self.char_type != "enemy":
+                self.ammo -= 1
             shot_fx.play()
 
     def ai(self):
