@@ -148,15 +148,6 @@ def a_star(start, goal, grid):
                 f_score[neighbor] = tentative_g_score + abs(goal[0] - neighbor[0]) + abs(goal[1] - neighbor[1])
                 open_set.add(neighbor)
     return None
-def column_is_empty(x, start_y, grid):
-    """
-    Kiểm tra xem cột tại chỉ số x từ hàng start_y đến hàng cuối cùng (ROWS-1)
-    có toàn là ô trống (-1) hoặc nước (9,10) hay không.
-    """
-    for y in range(start_y, len(grid)):
-        if grid[y][x] not in (-1, 9, 10):
-            return False
-    return True
 
 
 mixer.init()
@@ -180,7 +171,8 @@ TILE_TYPES = 21
 MAX_LEVELS = 3
 screen_scroll = 0
 bg_scroll = 0
-level = 1
+level = 2
+
 
 start_game = False
 start_intro = False
@@ -397,7 +389,7 @@ class Soldier(pygame.sprite.Sprite):
             shot_fx.play()
 
     def ai(self):
-            # Kiểm tra trạng thái sống của enemy và player
+        # Kiểm tra trạng thái sống của enemy và player
         if not self.alive or not player.alive:
             return
 
@@ -410,6 +402,7 @@ class Soldier(pygame.sprite.Sprite):
         if distance_to_player <= VISION_RANGE:
             self.chasing = True
 
+        # Nếu đang trong chế độ đuổi theo, sử dụng A* để tìm đường đi
         if self.chasing:
             # Xác định vị trí hiện tại của enemy và player theo ô trên lưới
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
@@ -419,73 +412,49 @@ class Soldier(pygame.sprite.Sprite):
             path = a_star(start, goal, world_data)
             
             if path and len(path) > 1:
-               # Lấy ô tiếp theo trong đường đi
+                # Lấy ô tiếp theo trong đường đi
                 next_cell = path[1]
                 target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
                 target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
 
-                # Các điều kiện nhảy ban đầu:
+                # Xét xem nước đi này có phải là nước nhảy xa hay không
+                # Nếu ô kế tiếp cách xa hơn 1 ô so với ô hiện tại, thì xem đây là hành động nhảy.
                 if abs(next_cell[0] - start[0]) > 1 or abs(next_cell[1] - start[1]) > 1:
                     self.jump = True
+                # Nếu ô kế tiếp cao hơn vị trí hiện tại và enemy không đang trong không trung, cũng kích hoạt nhảy.
                 elif target_y < self.rect.centery and not self.in_air:
                     self.jump = True
-                else:
-                    try:
-                        tile_value = world_data[next_cell[1]][next_cell[0]]
-                        tile_top_y = next_cell[1] * TILE_SIZE  # Vị trí y của đỉnh ô kế tiếp
-                        # Nếu gặp nước (9,10)
-                        if tile_value in (9, 10):
-                            self.jump = True
-                        # Nếu gặp ô trống (-1) nhưng không phải bất kỳ ô -1 nào,
-                        # chỉ khi cột đó hoàn toàn trống (tất cả từ ô đó xuống dưới đều -1 hoặc là nước)
-                        elif tile_value == -1 and column_is_empty(next_cell[0], next_cell[1], world_data) and not self.in_air:
-                            self.jump = True
-                        # Nếu ô kế tiếp là ô đất (0 đến 8) nhưng có đỉnh cao hơn so với vị trí "chân" hiện tại của enemy,
-                        # tức là tile_top_y < self.rect.bottom
-                        elif 0 <= tile_value <= 8 and tile_top_y < self.rect.bottom and not self.in_air:
-                            self.jump = True
-                    except IndexError:
-                        pass
-                # --- PHẦN DI CHUYỂN ĐƯỢC CHỈNH SỬA ---
-                # Khai báo cờ để xác định việc di chuyển
-                moved = False
+
+                # Di chuyển theo hướng phù hợp (chỉ xét theo trục ngang ở đây, có thể mở rộng cho dọc nếu cần)
                 if self.rect.centerx < target_x:
                     self.move(moving_left=False, moving_right=True)
                     self.direction = 1
-                    moved = True
                 elif self.rect.centerx > target_x:
                     self.move(moving_left=True, moving_right=False)
                     self.direction = -1
-                    moved = True
                 else:
-                    # Không di chuyển theo trục ngang nếu đã đạt target_x
                     self.move(moving_left=False, moving_right=False)
-
-                # Nếu enemy di chuyển và đang trên mặt đất, cập nhật hoạt ảnh chạy (Run – action index 1)
-                if moved and not self.in_air:
-                    self.update_action(1)
-                else:
-                    # Nếu không di chuyển, giữ hoạt ảnh Idle (action index 0)
-                    self.update_action(0)
-                # -----------------------------------------
-
+                    
                 # Cập nhật vùng "vision" theo hướng di chuyển hiện tại
                 self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
                 
-                # Nếu player nằm trong vùng "vision", enemy sẽ bắn
+                # Nếu player nằm trong vùng "vision", enemy sẽ bắn và có thể ném lựu nếu đủ gần
                 if self.vision.colliderect(player.rect):
                     self.shoot()
+                    now_time = pygame.time.get_ticks()
+                    if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
+                        if now_time - self.grenade_time > random.randint(2000, 3000):
+                            grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
+                            grenade_group.add(grenade_)
+                            self.grenade_time = now_time
+                            self.grenades -= 1
             else:
-                # Nếu không tìm được đường, enemy đứng yên
+                # Nếu không tìm được đường, enemy đứng yên (hoặc có thể thực hiện hành động khác như tuần tra)
                 self.move(moving_left=False, moving_right=False)
-                self.update_action(0)
-        
-        else:
-            # Nếu không ở trạng thái đuổi theo, hiển thị hoạt ảnh Idle (action index 0)
-            self.update_action(0)
         
         # Điều chỉnh vị trí enemy theo screen_scroll
         self.rect.x += screen_scroll
+
 
 
     def update_animation(self):
