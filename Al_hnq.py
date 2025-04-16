@@ -192,10 +192,10 @@ shot_fx.set_volume(0.5)
 grenade_fx = pygame.mixer.Sound("audio/grenade.wav")
 grenade_fx.set_volume(0.7)
 
-pine1_img = pygame.image.load("img/Background/pine1.png").convert_alpha()
-pine2_img = pygame.image.load("img/Background/pine2.png").convert_alpha()
-mountain_img = pygame.image.load("img/Background/mountain.png").convert_alpha()
-sky_img = pygame.image.load("img/Background/sky_cloud.png").convert_alpha()
+pine1_img = pygame.image.load("img/background2/pine1.png").convert_alpha()
+pine2_img = pygame.image.load("img/background2/pine2.png").convert_alpha()
+mountain_img = pygame.image.load("img/background2/mountain.png").convert_alpha()
+sky_img = pygame.image.load("img/background2/sky_cloud.png").convert_alpha()
 
 start_img = pygame.image.load("img/start_btn.png").convert_alpha()
 exit_img = pygame.image.load("img/exit_btn.png").convert_alpha()
@@ -387,7 +387,7 @@ class Soldier(pygame.sprite.Sprite):
         self.rect.x += dx
         self.rect.y += dy
 
-        # Với player, điều chỉnh background (scroll) nếu sprite chạm ngưỡng cuộn màn hình
+        # Với player, điều chỉnh background2 (scroll) nếu sprite chạm ngưỡng cuộn màn hình
         if self.char_type == "player":
             if (self.rect.right > SCREEN_WIDTH - SCROLL_THRESH and 
                 bg_scroll < world.level_length * TILE_SIZE - SCREEN_WIDTH) or \
