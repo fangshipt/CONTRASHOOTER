@@ -9,10 +9,6 @@ import math
 import heapq
 
 def read_level_data(filename):
-    """
-    Đọc dữ liệu level từ file CSV.
-    Mỗi hàng trong file được chuyển thành một list số nguyên.
-    """
     grid = []
     with open(filename, newline="") as csvfile:
         reader = csv.reader(csvfile, delimiter=",")
@@ -21,12 +17,6 @@ def read_level_data(filename):
     return grid
 
 def is_safe(x, y, grid):
-    """
-    Kiểm tra ô (x,y) có an toàn để đi qua hay không.
-    An toàn nếu:
-      - Giá trị ô không phải là nước (9,10)
-      - Nếu ô nằm ở hàng cuối (y == ROWS-1), thì giá trị không được là -1 (pit)
-    """
     val = grid[y][x]
     if val in (9, 10):
         return False
@@ -35,30 +25,18 @@ def is_safe(x, y, grid):
     return True
 
 def a_star(start, goal, grid):
-    """
-    Tìm đường đi từ start đến goal trong grid bằng thuật toán A*.
-    Cho phép di chuyển theo cả 2 hướng:
-      - Di chuyển “bình thường” theo hàng ngang và dọc với bước = 1 ô.
-      - Di chuyển “nhảy” xa: xét các bước nhảy theo hàng ngang và dọc (tối đa 4 ô).
-        Trong trường hợp nhảy, các ô trung gian phải là ô nguy hiểm (không an toàn)
-        và ô hạ cánh phải an toàn.
-    Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
-    """
     def get_neighbors(node):
         x, y = node
         neighbors = []
 
-        # Hướng ngang: sang phải và sang trái
-        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
+        for dx in range(1, 5):
             candidate_x = x + dx
             if candidate_x >= COLS:
                 break
             if dx == 1:
-                # Di chuyển liền kề
                 if is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
             else:
-                # Với bước nhảy xa: các ô trung gian phải không an toàn (nguy hiểm)
                 jump_possible = True
                 for step in range(1, dx):
                     if is_safe(x + step, y, grid):
@@ -66,7 +44,7 @@ def a_star(start, goal, grid):
                         break
                 if jump_possible and is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
-        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
+        for dx in range(1, 5): 
             candidate_x = x - dx
             if candidate_x < 0:
                 break
@@ -81,9 +59,8 @@ def a_star(start, goal, grid):
                         break
                 if jump_possible and is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
-                    
-        # Hướng dọc: xuống và lên
-        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
+
+        for dy in range(1, 5): 
             candidate_y = y + dy
             if candidate_y >= ROWS:
                 break
@@ -98,7 +75,7 @@ def a_star(start, goal, grid):
                         break
                 if jump_possible and is_safe(x, candidate_y, grid):
                     neighbors.append((x, candidate_y))
-        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
+        for dy in range(1, 5): 
             candidate_y = y - dy
             if candidate_y < 0:
                 break
@@ -118,13 +95,11 @@ def a_star(start, goal, grid):
     open_set = set([start])
     came_from = {}
     g_score = {start: 0}
-    # Sử dụng khoảng cách Manhattan làm heuristic
     f_score = {start: abs(goal[0] - start[0]) + abs(goal[1] - start[1])}
 
     while open_set:
         current = min(open_set, key=lambda node: f_score.get(node, float("inf")))
         if current == goal:
-            # Xây dựng lại đường đi từ goal về start
             path = [current]
             while current in came_from:
                 current = came_from[current]
@@ -134,11 +109,9 @@ def a_star(start, goal, grid):
 
         open_set.remove(current)
         for neighbor in get_neighbors(current):
-            # Tính chi phí di chuyển:
-            # Nếu di chuyển liền kề thì chi phí = 1, nếu là nhảy xa thì chi phí = khoảng cách (số ô)
             dx = abs(neighbor[0] - current[0])
             dy = abs(neighbor[1] - current[1])
-            move_cost = dx if dx > dy else dy  # vì chỉ di chuyển theo hàng ngang hoặc dọc
+            move_cost = dx if dx > dy else dy
             if move_cost == 0:
                 move_cost = 1
             tentative_g_score = g_score[current] + move_cost
@@ -171,7 +144,7 @@ TILE_TYPES = 21
 MAX_LEVELS = 3
 screen_scroll = 0
 bg_scroll = 0
-level = 1  # Bắt đầu từ level 1
+level = 1
 
 # Trạng thái trò chơi
 start_game = False
@@ -194,19 +167,17 @@ grenade_fx = pygame.mixer.Sound("audio/grenade.wav")
 grenade_fx.set_volume(0.7)
 
 # Tải hình ảnh nền
-# Tải hình ảnh nền cho level 1
 pine1_level1_img = pygame.image.load("img/Background/pine1.png").convert_alpha()
 pine2_level1_img = pygame.image.load("img/Background/pine2.png").convert_alpha()
 mountain_level1_img = pygame.image.load("img/Background/mountain.png").convert_alpha()
 sky_level1_img = pygame.image.load("img/Background/sky_cloud.png").convert_alpha()
 
-# Tải hình ảnh nền cho level 2 trở đi
+
 pine1_level2_img = pygame.image.load("img/Background2/pine1.png").convert_alpha()
 pine2_level2_img = pygame.image.load("img/Background2/pine2.png").convert_alpha()
 mountain_level2_img = pygame.image.load("img/Background2/mountain.png").convert_alpha()
 sky_level2_img = pygame.image.load("img/Background2/sky_cloud.png").convert_alpha()
 
-# Lưu các bộ background vào một dictionary để dễ quản lý
 backgrounds = {
     "level1": {
         "sky": sky_level1_img,
@@ -255,7 +226,7 @@ BLACK = (0, 0, 0)
 PINK = (235, 65, 54)
 
 # Font chữ
-font = pygame.font.SysFont("Futura", 30)
+font = pygame.font.SysFont("Cookie", 30)
 
 # Hàm vẽ văn bản
 def draw_text(text, font, text_color, x, y):
@@ -469,7 +440,6 @@ class Soldier(pygame.sprite.Sprite):
 
                 if self.vision.colliderect(player.rect):
                     self.shoot()
-                    # Chỉ ở level 2 trở lên, enemy mới ném lựu đạn
                     if level >= 2:
                         now_time = pygame.time.get_ticks()
                         if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
@@ -778,7 +748,6 @@ decoration_group = pygame.sprite.Group()
 water_group = pygame.sprite.Group()
 exit_group = pygame.sprite.Group()
 
-# Tải dữ liệu level 1 ban đầu
 world_data = []
 for row in range(ROWS):
     r = [-1] * COLS
@@ -793,7 +762,6 @@ with open(f"level{level}_data.csv", newline="") as csvfile:
 world = World()
 player, health_bar = world.process_data(world_data, level)
 
-# Vòng lặp chính
 run = True
 while run:
     clock.tick(FPS)
@@ -867,7 +835,7 @@ while run:
 
             if level_complete:
                 start_intro = True
-                level += 1  # Tăng level để chuyển sang level tiếp theo
+                level += 1 
                 if level <= MAX_LEVELS:
                     bg_scroll = 0
                     world_data = reset_level()
@@ -879,7 +847,6 @@ while run:
                     world = World()
                     player, health_bar = world.process_data(world_data, level)
                 else:
-                    # Nếu vượt quá số level tối đa, hiển thị màn hình chiến thắng
                     draw_text("YOU WIN!", font, WHITE, SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2)
                     pygame.display.update()
                     pygame.time.wait(2000)
