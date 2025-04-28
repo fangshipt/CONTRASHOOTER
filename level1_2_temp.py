@@ -416,6 +416,8 @@ class Soldier(pygame.sprite.Sprite):
         if self.shoot_cooldown == 0:
             # Nếu ở level 1: cooldown là 20 (cả player và enemy)
             # Nếu ở level 2: cooldown của enemy là 15, player vẫn là 20
+            if self.char_type != "enemy" and self.ammo <= 0:
+                return
             self.shoot_cooldown = 15 if self.char_type == "enemy" and level >= 2 else 20
             bullet = Bullet(self.rect.centerx + (0.75 * self.rect.size[0] * self.direction), 
                             self.rect.centery, self.direction)
