@@ -6,7 +6,7 @@ import random
 import csv
 import button
 import math
-import heapq
+from collections import deque
 
 def read_level_data(filename):
     """
@@ -34,9 +34,9 @@ def is_safe(x, y, grid):
         return False
     return True
 
-def a_star(start, goal, grid):
+def bfs(start, goal, grid):
     """
-    Tìm đường đi từ start đến goal trong grid bằng thuật toán A*.
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán BFS.
     Cho phép di chuyển theo cả 2 hướng:
       - Di chuyển “bình thường” theo hàng ngang và dọc với bước = 1 ô.
       - Di chuyển “nhảy” xa: xét các bước nhảy theo hàng ngang và dọc (tối đa 4 ô).
@@ -115,47 +115,33 @@ def a_star(start, goal, grid):
                     neighbors.append((x, candidate_y))
         return neighbors
 
-    open_set = set([start])
-    came_from = {}
-    g_score = {start: 0}
-    # Sử dụng khoảng cách Manhattan làm heuristic
-    f_score = {start: abs(goal[0] - start[0]) + abs(goal[1] - start[1])}
+    queue = deque([start])
+    came_from = {start: None}
 
-    while open_set:
-        current = min(open_set, key=lambda node: f_score.get(node, float("inf")))
+    while queue:
+        current = queue.popleft()
         if current == goal:
             # Xây dựng lại đường đi từ goal về start
-            path = [current]
-            while current in came_from:
-                current = came_from[current]
+            path = []
+            while current is not None:
                 path.append(current)
+                current = came_from[current]
             path.reverse()
             return path
 
-        open_set.remove(current)
         for neighbor in get_neighbors(current):
-            # Tính chi phí di chuyển:
-            # Nếu di chuyển liền kề thì chi phí = 1, nếu là nhảy xa thì chi phí = khoảng cách (số ô)
-            dx = abs(neighbor[0] - current[0])
-            dy = abs(neighbor[1] - current[1])
-            move_cost = dx if dx > dy else dy  # vì chỉ di chuyển theo hàng ngang hoặc dọc
-            if move_cost == 0:
-                move_cost = 1
-            tentative_g_score = g_score[current] + move_cost
-            if tentative_g_score < g_score.get(neighbor, float("inf")):
+            if neighbor not in came_from:
+                queue.append(neighbor)
                 came_from[neighbor] = current
-                g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = tentative_g_score + abs(goal[0] - neighbor[0]) + abs(goal[1] - neighbor[1])
-                open_set.add(neighbor)
     return None
 
-
+# Khởi tạo pygame
 mixer.init()
 pygame.init()
 
+# Thiết lập màn hình và các hằng số
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = int(SCREEN_WIDTH * 0.8)
-
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Shooter Game")
 
@@ -171,18 +157,18 @@ TILE_TYPES = 21
 MAX_LEVELS = 3
 screen_scroll = 0
 bg_scroll = 0
-level = 2
+level = 1  # Bắt đầu từ level 1
 
-
+# Trạng thái trò chơi
 start_game = False
 start_intro = False
-
 moving_left = False
 moving_right = False
 shoot = False
 grenade = False
 grenade_thrown = False
 
+# Tải âm thanh
 pygame.mixer.music.load("audio/music2.mp3")
 pygame.mixer.music.set_volume(0.3)
 pygame.mixer.music.play(-1, 0.0, 5000)
@@ -193,24 +179,50 @@ shot_fx.set_volume(0.5)
 grenade_fx = pygame.mixer.Sound("audio/grenade.wav")
 grenade_fx.set_volume(0.7)
 
-pine1_img = pygame.image.load("img/Background/pine1.png").convert_alpha()
-pine2_img = pygame.image.load("img/Background/pine2.png").convert_alpha()
-mountain_img = pygame.image.load("img/Background/mountain.png").convert_alpha()
-sky_img = pygame.image.load("img/Background/sky_cloud.png").convert_alpha()
+# Tải hình ảnh nền
+# Tải hình ảnh nền cho level 1
+pine1_level1_img = pygame.image.load("img/Background/pine1.png").convert_alpha()
+pine2_level1_img = pygame.image.load("img/Background/pine2.png").convert_alpha()
+mountain_level1_img = pygame.image.load("img/Background/mountain.png").convert_alpha()
+sky_level1_img = pygame.image.load("img/Background/sky_cloud.png").convert_alpha()
 
+# Tải hình ảnh nền cho level 2 trở đi
+pine1_level2_img = pygame.image.load("img/Background2/pine1.png").convert_alpha()
+pine2_level2_img = pygame.image.load("img/Background2/pine2.png").convert_alpha()
+mountain_level2_img = pygame.image.load("img/Background2/mountain.png").convert_alpha()
+sky_level2_img = pygame.image.load("img/Background2/sky_cloud.png").convert_alpha()
+
+# Lưu các bộ background vào một dictionary để dễ quản lý
+backgrounds = {
+    "level1": {
+        "sky": sky_level1_img,
+        "mountain": mountain_level1_img,
+        "pine1": pine1_level1_img,
+        "pine2": pine2_level1_img
+    },
+    "level2_up": {
+        "sky": sky_level2_img,
+        "mountain": mountain_level2_img,
+        "pine1": pine1_level2_img,
+        "pine2": pine2_level2_img
+    }
+}
+
+# Tải hình ảnh nút
 start_img = pygame.image.load("img/start_btn.png").convert_alpha()
 exit_img = pygame.image.load("img/exit_btn.png").convert_alpha()
 restart_img = pygame.image.load("img/restart_btn.png").convert_alpha()
 
+# Tải hình ảnh ô (tile)
 img_list = []
 for x in range(TILE_TYPES):
     img = pygame.image.load(f"img/tile/{x}.png")
     img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
     img_list.append(img)
 
+# Tải hình ảnh vật phẩm
 bullet_img = pygame.image.load("img/icons/bullet.png").convert_alpha()
 grenade_img = pygame.image.load("img/icons/grenade.png").convert_alpha()
-
 health_box_img = pygame.image.load("img/icons/health_box.png").convert_alpha()
 ammo_box_img = pygame.image.load("img/icons/ammo_box.png").convert_alpha()
 grenade_box_img = pygame.image.load("img/icons/grenade_box.png").convert_alpha()
@@ -220,6 +232,7 @@ item_boxes = {
     "Grenade": grenade_box_img
 }
 
+# Định nghĩa màu sắc
 BG = (144, 201, 120)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
@@ -227,21 +240,28 @@ GREEN = (0, 255, 0)
 BLACK = (0, 0, 0)
 PINK = (235, 65, 54)
 
+# Font chữ
 font = pygame.font.SysFont("Futura", 30)
 
+# Hàm vẽ văn bản
 def draw_text(text, font, text_color, x, y):
     img = font.render(text, True, text_color)
     screen.blit(img, (x, y))
 
+# Hàm vẽ nền
 def draw_bg():
     screen.fill(BG)
-    width = sky_img.get_width()
+    # Chọn bộ background dựa trên level
+    bg_set = backgrounds["level2_up"] if level >= 2 else backgrounds["level1"]
+    
+    width = bg_set["sky"].get_width()
     for x in range(5):
-        screen.blit(sky_img, ((x * width) - bg_scroll * 0.5, 0))
-        screen.blit(mountain_img, ((x * width) - bg_scroll * 0.6, SCREEN_HEIGHT - mountain_img.get_height() - 300))
-        screen.blit(pine1_img, ((x * width) - bg_scroll * 0.7, SCREEN_HEIGHT - pine1_img.get_height() - 150))
-        screen.blit(pine2_img, ((x * width) - bg_scroll * 0.8, SCREEN_HEIGHT - pine2_img.get_height()))
+        screen.blit(bg_set["sky"], ((x * width) - bg_scroll * 0.5, 0))
+        screen.blit(bg_set["mountain"], ((x * width) - bg_scroll * 0.6, SCREEN_HEIGHT - bg_set["mountain"].get_height() - 300))
+        screen.blit(bg_set["pine1"], ((x * width) - bg_scroll * 0.7, SCREEN_HEIGHT - bg_set["pine1"].get_height() - 150))
+        screen.blit(bg_set["pine2"], ((x * width) - bg_scroll * 0.8, SCREEN_HEIGHT - bg_set["pine2"].get_height()))
 
+# Hàm reset level
 def reset_level():
     enemy_group.empty()
     bullet_group.empty()
@@ -258,6 +278,7 @@ def reset_level():
         data.append(r)
     return data
 
+# Lớp Soldier (bao gồm cả player và enemy)
 class Soldier(pygame.sprite.Sprite):
     def __init__(self, char_type, x, y, scale, speed, ammo, grenades):
         super().__init__()
@@ -286,6 +307,7 @@ class Soldier(pygame.sprite.Sprite):
         self.idling_counter = 0
         self.grenade_time = pygame.time.get_ticks()
 
+        # Tải animation
         animation_types = ["Idle", "Run", "Jump", "Death"]
         for animation in animation_types:
             temp_list = []
@@ -306,12 +328,11 @@ class Soldier(pygame.sprite.Sprite):
         self.check_alive()
 
         if not self.alive:
-            self.kill()  # Xóa enemy khỏi tất cả sprite groups ngay khi chết
-            return  # Dừng cập nhật
+            self.kill()
+            return
 
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1
-
 
     def move(self, moving_left, moving_right):
         screen_scroll = 0
@@ -326,14 +347,14 @@ class Soldier(pygame.sprite.Sprite):
             dx = self.speed
             self.flip = False
             self.direction = 1
-        if self.jump and self.in_air == False:
+        if self.jump and not self.in_air:
             self.vel_y = -11
             self.jump = False
             self.in_air = True
 
         self.vel_y += GRAVITY
         if self.vel_y > 10:
-            self.vel_y
+            self.vel_y = 10
         dy += self.vel_y
 
         for tile in world.obstacle_list:
@@ -342,7 +363,6 @@ class Soldier(pygame.sprite.Sprite):
                 if self.char_type == "enemy":
                     self.direction *= -1
                     self.move_counter = 0
-
             if tile[1].colliderect(self.rect.x, self.rect.y + dy, self.width, self.height):
                 if self.vel_y < 0:
                     self.vel_y = 0
@@ -378,22 +398,23 @@ class Soldier(pygame.sprite.Sprite):
         return screen_scroll, level_complete
 
     def shoot(self):
+        global level
         if self.shoot_cooldown == 0:
-            # Nếu enemy: cooldown nhanh hơn (10); player thì giữ nguyên (20)
-            self.shoot_cooldown = 15 if self.char_type == "enemy" else 20
+            # Nếu ở level 1: cooldown là 20 (cả player và enemy)
+            # Nếu ở level 2: cooldown của enemy là 15, player vẫn là 20
+            self.shoot_cooldown = 15 if self.char_type == "enemy" and level >= 2 else 20
             bullet = Bullet(self.rect.centerx + (0.75 * self.rect.size[0] * self.direction), 
                             self.rect.centery, self.direction)
             bullet_group.add(bullet)
-            # Nếu là player thì giảm số đạn, enemy có đạn vô cực
             if self.char_type != "enemy":
                 self.ammo -= 1
             shot_fx.play()
 
     def ai(self):
+        global level
         if not self.alive or not player.alive:
             return
 
-        # Tính khoảng cách đến player
         distance_to_player = math.hypot(self.rect.centerx - player.rect.centerx,
                                         self.rect.centery - player.rect.centery)
         VISION_RANGE = TILE_SIZE * 6
@@ -402,28 +423,21 @@ class Soldier(pygame.sprite.Sprite):
             self.chasing = True
 
         if self.chasing:
-            # Xác định ô hiện tại và ô đích của enemy theo lưới
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
             goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-            
-            # Tìm đường đi bằng thuật toán A*
-            path = a_star(start, goal, world_data)
-            
-            # Biến kiểm tra trạng thái di chuyển
+            path = bfs(start, goal, world_data)
+
             moving = False
-            
             if path and len(path) > 1:
                 next_cell = path[1]
                 target_x = next_cell[0] * TILE_SIZE + TILE_SIZE // 2
                 target_y = next_cell[1] * TILE_SIZE + TILE_SIZE // 2
 
-                # Nếu di chuyển xa (nhảy), kích hoạt nhảy
                 if abs(next_cell[0] - start[0]) > 1 or abs(next_cell[1] - start[1]) > 1:
                     self.jump = True
                 elif target_y < self.rect.centery and not self.in_air:
                     self.jump = True
 
-                # Quyết định di chuyển theo chiều ngang để tiến tới target_x
                 if self.rect.centerx < target_x:
                     self.move(moving_left=False, moving_right=True)
                     self.direction = 1
@@ -434,38 +448,33 @@ class Soldier(pygame.sprite.Sprite):
                     moving = True
                 else:
                     self.move(moving_left=False, moving_right=False)
-                
-                # Cập nhật vùng tầm nhìn của enemy
+
                 self.vision.center = (self.rect.centerx + 75 * self.direction, self.rect.centery)
-                
-                # Nếu player nằm trong vùng vision, enemy sẽ bắn và có thể ném lựu
+
                 if self.vision.colliderect(player.rect):
                     self.shoot()
-                    now_time = pygame.time.get_ticks()
-                    if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
-                        if now_time - self.grenade_time > random.randint(1000, 1500):
-                            grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
-                            grenade_group.add(grenade_)
-                            self.grenade_time = now_time
-                            self.grenades -= 1
+                    # Chỉ ở level 2 trở lên, enemy mới ném lựu đạn
+                    if level >= 2:
+                        now_time = pygame.time.get_ticks()
+                        if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
+                            if now_time - self.grenade_time > random.randint(1000, 1500):
+                                grenade_ = Grenade(self.rect.centerx, self.rect.centery, self.direction)
+                                grenade_group.add(grenade_)
+                                self.grenade_time = now_time
+                                self.grenades -= 1
             else:
-                # Nếu không có đường đi (có thể enemy đứng yên hoặc tuần tra)
                 self.move(moving_left=False, moving_right=False)
-            
-            # Cập nhật trạng thái animation của enemy như player:
+
             if self.in_air:
-                self.update_action(2)  # Nhảy
+                self.update_action(2)
             elif moving:
-                self.update_action(1)  # Chạy
+                self.update_action(1)
             else:
-                self.update_action(0)  # Đứng yên
+                self.update_action(0)
         else:
             self.move(moving_left=False, moving_right=False)
-        
-        # Điều chỉnh vị trí enemy theo screen_scroll (nếu có)
+
         self.rect.x += screen_scroll
-
-
 
     def update_animation(self):
         ANIMATION_COOLDOWN = 100
@@ -495,6 +504,7 @@ class Soldier(pygame.sprite.Sprite):
     def draw(self):
         screen.blit(pygame.transform.flip(self.image, self.flip, False), self.rect)
 
+# Lớp ItemBox
 class ItemBox(pygame.sprite.Sprite):
     def __init__(self, item_type, x, y):
         super().__init__()
@@ -516,6 +526,7 @@ class ItemBox(pygame.sprite.Sprite):
                 player.grenades += 3
             self.kill()
 
+# Lớp HealthBar
 class HealthBar():
     def __init__(self, x, y, health, max_health):
         self.x = x
@@ -530,6 +541,7 @@ class HealthBar():
         pygame.draw.rect(screen, RED, (self.x, self.y, 150, 20))
         pygame.draw.rect(screen, GREEN, (self.x, self.y, 150 * ratio, 20))
 
+# Lớp Bullet
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
@@ -554,6 +566,7 @@ class Bullet(pygame.sprite.Sprite):
                     enemy.health -= 25
                     self.kill()
 
+# Lớp Grenade
 class Grenade(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
@@ -603,12 +616,13 @@ class Grenade(pygame.sprite.Sprite):
                    abs(self.rect.centery - enemy.rect.centery) < TILE_SIZE * 2:
                     enemy.health -= 50
 
+# Lớp World
 class World():
     def __init__(self):
         self.obstacle_list = []
         self.level_length = 0
 
-    def process_data(self, data):
+    def process_data(self, data, current_level):
         self.level_length = len(data[0])
         for y, row in enumerate(data):
             for x, tile in enumerate(row):
@@ -626,12 +640,13 @@ class World():
                     elif tile in [11, 13, 14]:
                         decoration = Decoration(img, x * TILE_SIZE, y * TILE_SIZE)
                         decoration_group.add(decoration)
-
                     elif tile == 15:
                         player = Soldier("player", x * TILE_SIZE, y * TILE_SIZE, 1.65, 5, 20, 5)
                         health_bar = HealthBar(10, 10, player.health, player.health)
                     elif tile == 16:
-                        enemy = Soldier("enemy", x * TILE_SIZE, y * TILE_SIZE, 1.65, 3.5, 20, 5)
+                        # Tốc độ enemy phụ thuộc vào level
+                        enemy_speed = 2 if current_level == 1 else 3.5
+                        enemy = Soldier("enemy", x * TILE_SIZE, y * TILE_SIZE, 1.65, enemy_speed, 20, 5)
                         enemy_group.add(enemy)
                     elif tile == 17:
                         item_box = ItemBox("Ammo", x * TILE_SIZE, y * TILE_SIZE)
@@ -652,6 +667,7 @@ class World():
             tile[1][0] += screen_scroll
             screen.blit(tile[0], tile[1])
 
+# Các lớp hỗ trợ khác
 class Decoration(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
         super().__init__()
@@ -729,6 +745,7 @@ class ScreenFade():
             fade_complete = True
         return fade_complete
 
+# Khởi tạo các đối tượng
 intro_fade = ScreenFade(1, BLACK, 4)
 death_fade = ScreenFade(2, PINK, 4)
 
@@ -745,6 +762,7 @@ decoration_group = pygame.sprite.Group()
 water_group = pygame.sprite.Group()
 exit_group = pygame.sprite.Group()
 
+# Tải dữ liệu level 1 ban đầu
 world_data = []
 for row in range(ROWS):
     r = [-1] * COLS
@@ -757,20 +775,20 @@ with open(f"level{level}_data.csv", newline="") as csvfile:
             world_data[y][x] = int(tile)
 
 world = World()
-player, health_bar = world.process_data(world_data)
+player, health_bar = world.process_data(world_data, level)
 
+# Vòng lặp chính
 run = True
 while run:
     clock.tick(FPS)
 
-    if start_game == False:
+    if not start_game:
         screen.fill(BG)
         if start_button.draw(screen):
             start_game = True
             start_intro = True
         if exit_button.draw(screen):
             run = False
-
     else:
         draw_bg()
         world.draw()
@@ -814,7 +832,7 @@ while run:
         if player.alive:
             if shoot:
                 player.shoot()
-            elif grenade and grenade_thrown == False and player.grenades > 0:
+            elif grenade and not grenade_thrown and player.grenades > 0:
                 grenade_ = Grenade(player.rect.centerx + (0.5 * player.rect.size[0] * player.direction),
                                    player.rect.top, player.direction)
                 grenade_group.add(grenade_)
@@ -833,18 +851,23 @@ while run:
 
             if level_complete:
                 start_intro = True
-                level += 1
-                bg_scroll = 0
-                world_data = reset_level()
+                level += 1  # Tăng level để chuyển sang level tiếp theo
                 if level <= MAX_LEVELS:
+                    bg_scroll = 0
+                    world_data = reset_level()
                     with open(f"level{level}_data.csv", newline="") as csvfile:
                         reader = csv.reader(csvfile, delimiter=",")
                         for y, row in enumerate(reader):
                             for x, tile in enumerate(row):
                                 world_data[y][x] = int(tile)
-
                     world = World()
-                    player, health_bar = world.process_data(world_data)
+                    player, health_bar = world.process_data(world_data, level)
+                else:
+                    # Nếu vượt quá số level tối đa, hiển thị màn hình chiến thắng
+                    draw_text("YOU WIN!", font, WHITE, SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2)
+                    pygame.display.update()
+                    pygame.time.wait(2000)
+                    run = False
 
         else:
             screen_scroll = 0
@@ -859,9 +882,8 @@ while run:
                         for y, row in enumerate(reader):
                             for x, tile in enumerate(row):
                                 world_data[y][x] = int(tile)
-
                     world = World()
-                    player, health_bar = world.process_data(world_data)
+                    player, health_bar = world.process_data(world_data, level)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -873,7 +895,7 @@ while run:
                 moving_left = True
             if event.key == pygame.K_d:
                 moving_right = True
-            if event.key == pygame.K_SPACE:
+            if event.key == pygame.K_space:
                 shoot = True
             if event.key == pygame.K_q:
                 grenade = True
@@ -887,7 +909,7 @@ while run:
                 moving_left = False
             if event.key == pygame.K_d:
                 moving_right = False
-            if event.key == pygame.K_SPACE:
+            if event.key == pygame.K_space:
                 shoot = False
             if event.key == pygame.K_q:
                 grenade = False
