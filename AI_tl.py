@@ -251,6 +251,109 @@ def bfs(start, goal, grid):
 
     # Nếu không tìm được đường đi
     return None
+def beam_search(start, goal, grid, beam_width=5):
+    """
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán Beam Search.
+    Hỗ trợ di chuyển bình thường (bước = 1 ô) và nhảy xa (tối đa 4 ô).
+    Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
+    """
+    def get_neighbors(node):
+        x, y = node
+        neighbors = []
+
+        # Hướng ngang: sang phải và sang trái
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
+            candidate_x = x + dx
+            if candidate_x >= COLS:
+                break
+            if dx == 1:
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x + step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
+            candidate_x = x - dx
+            if candidate_x < 0:
+                break
+            if dx == 1:
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x - step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+                    
+        # Hướng dọc: xuống và lên
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
+            candidate_y = y + dy
+            if candidate_y >= ROWS:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y + step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
+            candidate_y = y - dy
+            if candidate_y < 0:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y - step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        return neighbors
+
+    def heuristic(node):
+        # Sử dụng khoảng cách Manhattan làm heuristic
+        return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
+
+    # Khởi tạo hàng đợi với đường đi ban đầu chỉ có start
+    queue = [[start]]
+    visited = set([start])
+
+    while queue:
+        new_queue = []
+        for path in queue:
+            current = path[-1]
+            if current == goal:
+                return path  # Trả về đường đi nếu đến được goal
+
+            neighbors = get_neighbors(current)
+            for neighbor in neighbors:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    new_path = path + [neighbor]
+                    new_queue.append(new_path)
+
+        # Sắp xếp các đường đi mới theo heuristic của nút cuối cùng
+        new_queue.sort(key=lambda p: heuristic(p[-1]))
+        # Giữ lại chỉ beam_width đường đi tốt nhất
+        queue = new_queue[:beam_width]
+
+    return None  # Không tìm được đường đi
 # Khởi tạo pygame
 mixer.init()
 pygame.init()
@@ -283,6 +386,8 @@ moving_right = False
 shoot = False
 grenade = False
 grenade_thrown = False
+# Biến lưu thuật toán được chọn
+selected_algorithm = None
 
 # Tải âm thanh
 pygame.mixer.music.load("audio/music2.mp3")
@@ -328,6 +433,10 @@ backgrounds = {
 start_img = pygame.image.load("img/start_btn.png").convert_alpha()
 exit_img = pygame.image.load("img/exit_btn.png").convert_alpha()
 restart_img = pygame.image.load("img/restart_btn.png").convert_alpha()
+# Tải hình ảnh cho các nút chọn thuật toán
+beamsearch_img = pygame.image.load("img/start_BeamSearch_btn.png").convert_alpha()
+bfs_img = pygame.image.load("img/start_BFS_btn.png").convert_alpha()
+astar_img = pygame.image.load("img/start_AStar_btn.png").convert_alpha()
 
 # Tải hình ảnh ô (tile)
 img_list = []
@@ -541,7 +650,15 @@ class Soldier(pygame.sprite.Sprite):
         if self.chasing:
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
             goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-            path = bfs(start, goal, world_data)
+                # Gọi thuật toán dựa trên lựa chọn
+            if selected_algorithm == "beam_search":
+                path = beam_search(start, goal, world_data)
+            elif selected_algorithm == "bfs":
+                path = bfs(start, goal, world_data)
+            elif selected_algorithm == "a_star":
+                path = a_star(start, goal, world_data)
+            else:
+                path = None  # Trường hợp không có thuật toán nào được chọn
 
             moving = False
             if path and len(path) > 1:
@@ -864,9 +981,20 @@ class ScreenFade():
 # Khởi tạo các đối tượng
 intro_fade = ScreenFade(1, BLACK, 4)
 death_fade = ScreenFade(2, PINK, 4)
+# Nút Exit cho màn hình chính
+main_exit_button = button.Button(SCREEN_WIDTH - 80, 30, pygame.transform.scale(exit_img, (70, 45)), 1)
+# Định nghĩa vị trí và khoảng cách giữa các nút
+button_width = beamsearch_img.get_width()  # Lấy chiều rộng thực tế của hình ảnh nút
+button_height = beamsearch_img.get_height()  # Lấy chiều cao thực tế của hình ảnh nút
+button_spacing = 30  # Tăng khoảng cách giữa các nút
+start_y = SCREEN_HEIGHT // 2 - (button_height * 4 + button_spacing * 3) // 2  # Căn giữa dọc
 
-start_button = button.Button(SCREEN_WIDTH // 2 - 130, SCREEN_HEIGHT // 2 - 150, start_img, 1)
-exit_button = button.Button(SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT // 2 + 50, exit_img, 1)
+# Khởi tạo các nút với khoảng cách đều
+start_beamsearch_button = button.Button(SCREEN_WIDTH // 2 - button_width // 2, start_y, beamsearch_img, 1)
+start_bfs_button = button.Button(SCREEN_WIDTH // 2 - button_width // 2, start_y + button_height + button_spacing, bfs_img, 1)
+start_astar_button = button.Button(SCREEN_WIDTH // 2 - button_width // 2, start_y + (button_height + button_spacing) * 2, astar_img, 1)
+exit_button = button.Button(SCREEN_WIDTH // 2 - button_width // 2, start_y + (button_height + button_spacing) * 3, exit_img, 1)
+# Khởi tạo nút Restart
 restart_button = button.Button(SCREEN_WIDTH // 2 - 90, SCREEN_HEIGHT // 2 - 50, restart_img, 1)
 
 enemy_group = pygame.sprite.Group()
@@ -900,9 +1028,21 @@ while run:
 
     if not start_game:
         screen.fill(BG)
-        if start_button.draw(screen):
+        draw_text("CHOOSE ALGORITHM:", font, WHITE, SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 300)
+        
+        if start_beamsearch_button.draw(screen):
+            selected_algorithm = "beam_search"
             start_game = True
             start_intro = True
+        if start_bfs_button.draw(screen):
+            selected_algorithm = "bfs"
+            start_game = True
+            start_intro = True
+        if start_astar_button.draw(screen):
+            selected_algorithm = "a_star"
+            start_game = True
+            start_intro = True
+
         if exit_button.draw(screen):
             run = False
     else:
@@ -915,9 +1055,30 @@ while run:
         draw_text("GRENADES: ", font, WHITE, 10, 60)
         for x in range(player.grenades):
             screen.blit(grenade_img, (135 + (x * 15), 60))
+        # Hiển thị thuật toán đang được chọn
+        draw_text(f"Algorithm: {selected_algorithm.upper()}", font, WHITE, SCREEN_WIDTH - 280, 10)
+        
+        # Hiển thị nút Exit
+        # Hiển thị nút Exit
+        if main_exit_button.draw(screen):
+            # Đặt lại trạng thái và quay về màn hình chọn thuật toán
+            start_game = False
+            start_intro = False
+            level = 1  # Đặt lại level về 1
+            bg_scroll = 0
+            world_data = reset_level()  # Reset dữ liệu level
+            with open(f"level{level}_data.csv", newline="") as csvfile:
+                reader = csv.reader(csvfile, delimiter=",")
+                for y, row in enumerate(reader):
+                    for x, tile in enumerate(row):
+                        world_data[y][x] = int(tile)
+            world = World()
+            player, health_bar = world.process_data(world_data, level)
         # Lấy số lượng enemy hiện tại từ group
         current_enemy_count = len(enemy_group)
         draw_text(f"ENEMIES: {current_enemy_count}", font, WHITE, 10, 85)
+        
+
         player.update()
         player.draw()
 
