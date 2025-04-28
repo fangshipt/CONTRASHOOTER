@@ -1,11 +1,5 @@
-import sys
-import os
-import random
 import csv
-import button
-import math
-import heapq
-from setting import *
+from setting import ROWS, COLS
 def read_level_data(filename):
     """
     Đọc dữ liệu level từ file CSV.

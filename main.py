@@ -6,7 +6,6 @@ import random
 import csv
 import button
 import math
-import heapq
 from setting import *
 from algorithm import *
 
