@@ -813,7 +813,9 @@ while run:
         draw_text("GRENADES: ", font, WHITE, 10, 60)
         for x in range(player.grenades):
             screen.blit(grenade_img, (135 + (x * 15), 60))
-
+        # Lấy số lượng enemy hiện tại từ group
+        current_enemy_count = len(enemy_group)
+        draw_text(f"ENEMIES: {current_enemy_count}", font, WHITE, 10, 85)
         player.update()
         player.draw()
 
