@@ -373,7 +373,7 @@ ROWS = 16
 COLS = 150
 TILE_SIZE = SCREEN_HEIGHT // ROWS
 TILE_TYPES = 21
-MAX_LEVELS = 3
+MAX_LEVELS = 2
 screen_scroll = 0
 bg_scroll = 0
 level = 1  # Bắt đầu từ level 1
@@ -404,10 +404,10 @@ grenade_fx.set_volume(0.7)
 
 # Tải hình ảnh nền
 # Tải hình ảnh nền cho level 1
-pine1_level1_img = pygame.image.load("img/Background/pine1.png").convert_alpha()
-pine2_level1_img = pygame.image.load("img/Background/pine2.png").convert_alpha()
-mountain_level1_img = pygame.image.load("img/Background/mountain.png").convert_alpha()
-sky_level1_img = pygame.image.load("img/Background/sky_cloud.png").convert_alpha()
+pine1_level1_img = pygame.image.load("img/Background1/pine1.png").convert_alpha()
+pine2_level1_img = pygame.image.load("img/Background1/pine2.png").convert_alpha()
+mountain_level1_img = pygame.image.load("img/Background1/mountain.png").convert_alpha()
+sky_level1_img = pygame.image.load("img/Background1/sky_cloud.png").convert_alpha()
 
 # Tải hình ảnh nền cho level 2 trở đi
 pine1_level2_img = pygame.image.load("img/Background2/pine1.png").convert_alpha()
