@@ -148,7 +148,109 @@ def a_star(start, goal, grid):
                 f_score[neighbor] = tentative_g_score + abs(goal[0] - neighbor[0]) + abs(goal[1] - neighbor[1])
                 open_set.add(neighbor)
     return None
+from collections import deque
 
+def bfs(start, goal, grid):
+    """
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán BFS.
+    Cho phép di chuyển theo các hướng "bình thường" và "nhảy xa".
+    Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
+    """
+    def get_neighbors(node):
+        x, y = node
+        neighbors = []
+
+        # Hướng ngang: sang phải và sang trái
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
+            candidate_x = x + dx
+            if candidate_x >= COLS:
+                break
+            if dx == 1:
+                # Di chuyển liền kề
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                # Với bước nhảy xa: các ô trung gian phải không an toàn (nguy hiểm)
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x + step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
+            candidate_x = x - dx
+            if candidate_x < 0:
+                break
+            if dx == 1:
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x - step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+
+        # Hướng dọc: xuống và lên
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
+            candidate_y = y + dy
+            if candidate_y >= ROWS:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y + step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
+            candidate_y = y - dy
+            if candidate_y < 0:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y - step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        return neighbors
+
+    # Khởi tạo hàng đợi BFS
+    queue = deque([start])
+    came_from = {start: None}
+
+    while queue:
+        current = queue.popleft()
+
+        # Nếu tìm thấy goal, xây dựng đường đi
+        if current == goal:
+            path = [current]
+            while current in came_from and came_from[current] is not None:
+                current = came_from[current]
+                path.append(current)
+            path.reverse()
+            return path
+
+        # Thêm các ô hàng xóm vào hàng đợi
+        for neighbor in get_neighbors(current):
+            if neighbor not in came_from:  # Đảm bảo không quay lại ô đã duyệt
+                queue.append(neighbor)
+                came_from[neighbor] = current
+
+    # Nếu không tìm được đường đi
+    return None
 # Khởi tạo pygame
 mixer.init()
 pygame.init()
@@ -439,7 +541,7 @@ class Soldier(pygame.sprite.Sprite):
         if self.chasing:
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
             goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-            path = a_star(start, goal, world_data)
+            path = bfs(start, goal, world_data)
 
             moving = False
             if path and len(path) > 1:
