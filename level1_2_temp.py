@@ -255,7 +255,7 @@ BLACK = (0, 0, 0)
 PINK = (235, 65, 54)
 
 # Font chữ
-font = pygame.font.SysFont("Futura", 30)
+font = pygame.font.SysFont("Cookie", 30)
 
 # Hàm vẽ văn bản
 def draw_text(text, font, text_color, x, y):
