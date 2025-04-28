@@ -468,7 +468,8 @@ BLACK = (0, 0, 0)
 PINK = (235, 65, 54)
 
 # Font chữ
-font = pygame.font.SysFont("Futura", 30)
+font = pygame.font.SysFont("Courier New", 25)
+small_font = pygame.font.SysFont('Courier New', 20)  
 
 # Hàm vẽ văn bản
 def draw_text(text, font, text_color, x, y):
@@ -1137,11 +1138,11 @@ while run:
         exit_rect = in_game_exit_btn.rect
 
         # Các thông số khoảng cách
-        margin    = 5    # khoảng cách giữa dòng dưới và đỉnh nút
+        margin    = 0    # khoảng cách giữa dòng dưới và đỉnh nút
         line_spc   = 2   # khoảng cách giữa 2 dòng text
 
         # Text dòng 1
-        label_text = "Algorithm:"
+        label_text = " Algorithm:"
         lw, lh     = font.size(label_text)
 
         # Text dòng 2
@@ -1156,12 +1157,12 @@ while run:
         # Vẽ dòng 1 (Algorithm:)
         lx = exit_rect.x + (exit_rect.width  - lw) // 2
         ly = start_y
-        draw_text(label_text, font, WHITE, lx, ly)
+        draw_text(label_text, small_font, WHITE, lx, ly)
 
         # Vẽ dòng 2 (tên thuật toán)
         nx = exit_rect.x + (exit_rect.width  - nw) // 2
         ny = ly + lh + line_spc
-        draw_text(name_text,  font, WHITE, nx, ny)
+        draw_text(name_text, small_font, WHITE, nx, ny)
         # 3) Vẽ và xử lý nút Exit in-game
         if in_game_exit_btn.draw(screen):
             start_game = False
