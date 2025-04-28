@@ -33,24 +33,32 @@ def is_safe(x, y, grid):
     if y == ROWS - 1 and val == -1:
         return False
     return True
-def ucs(start, goal, grid):
+
+def a_star(start, goal, grid):
     """
-    Tìm đường đi từ start đến goal trong grid bằng thuật toán UCS.
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán A*.
+    Cho phép di chuyển theo cả 2 hướng:
+      - Di chuyển “bình thường” theo hàng ngang và dọc với bước = 1 ô.
+      - Di chuyển “nhảy” xa: xét các bước nhảy theo hàng ngang và dọc (tối đa 4 ô).
+        Trong trường hợp nhảy, các ô trung gian phải là ô nguy hiểm (không an toàn)
+        và ô hạ cánh phải an toàn.
     Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
     """
     def get_neighbors(node):
-        # Giữ nguyên hàm get_neighbors từ code gốc
         x, y = node
         neighbors = []
+
         # Hướng ngang: sang phải và sang trái
-        for dx in range(1, 5):
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
             candidate_x = x + dx
             if candidate_x >= COLS:
                 break
             if dx == 1:
+                # Di chuyển liền kề
                 if is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
             else:
+                # Với bước nhảy xa: các ô trung gian phải không an toàn (nguy hiểm)
                 jump_possible = True
                 for step in range(1, dx):
                     if is_safe(x + step, y, grid):
@@ -58,7 +66,7 @@ def ucs(start, goal, grid):
                         break
                 if jump_possible and is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
-        for dx in range(1, 5):
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
             candidate_x = x - dx
             if candidate_x < 0:
                 break
@@ -73,8 +81,9 @@ def ucs(start, goal, grid):
                         break
                 if jump_possible and is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
+                    
         # Hướng dọc: xuống và lên
-        for dy in range(1, 5):
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
             candidate_y = y + dy
             if candidate_y >= ROWS:
                 break
@@ -89,7 +98,7 @@ def ucs(start, goal, grid):
                         break
                 if jump_possible and is_safe(x, candidate_y, grid):
                     neighbors.append((x, candidate_y))
-        for dy in range(1, 5):
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
             candidate_y = y - dy
             if candidate_y < 0:
                 break
@@ -106,16 +115,16 @@ def ucs(start, goal, grid):
                     neighbors.append((x, candidate_y))
         return neighbors
 
-    # Sử dụng hàng đợi ưu tiên để ưu tiên chi phí thấp nhất
-    open_set = [(0, start)]  # (g_score, node)
+    open_set = set([start])
     came_from = {}
     g_score = {start: 0}
-    visited = set()
+    # Sử dụng khoảng cách Manhattan làm heuristic
+    f_score = {start: abs(goal[0] - start[0]) + abs(goal[1] - start[1])}
 
     while open_set:
-        current_g, current = heapq.heappop(open_set)
+        current = min(open_set, key=lambda node: f_score.get(node, float("inf")))
         if current == goal:
-            # Xây dựng lại đường đi
+            # Xây dựng lại đường đi từ goal về start
             path = [current]
             while current in came_from:
                 current = came_from[current]
@@ -123,25 +132,228 @@ def ucs(start, goal, grid):
             path.reverse()
             return path
 
-        if current in visited:
-            continue
-        visited.add(current)
-
+        open_set.remove(current)
         for neighbor in get_neighbors(current):
+            # Tính chi phí di chuyển:
+            # Nếu di chuyển liền kề thì chi phí = 1, nếu là nhảy xa thì chi phí = khoảng cách (số ô)
             dx = abs(neighbor[0] - current[0])
             dy = abs(neighbor[1] - current[1])
-            move_cost = dx if dx > dy else dy  # Chi phí di chuyển
+            move_cost = dx if dx > dy else dy  # vì chỉ di chuyển theo hàng ngang hoặc dọc
             if move_cost == 0:
                 move_cost = 1
             tentative_g_score = g_score[current] + move_cost
-
             if tentative_g_score < g_score.get(neighbor, float("inf")):
                 came_from[neighbor] = current
                 g_score[neighbor] = tentative_g_score
-                heapq.heappush(open_set, (tentative_g_score, neighbor))
-    
+                f_score[neighbor] = tentative_g_score + abs(goal[0] - neighbor[0]) + abs(goal[1] - neighbor[1])
+                open_set.add(neighbor)
     return None
+from collections import deque
 
+def bfs(start, goal, grid):
+    """
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán BFS.
+    Cho phép di chuyển theo các hướng "bình thường" và "nhảy xa".
+    Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
+    """
+    def get_neighbors(node):
+        x, y = node
+        neighbors = []
+
+        # Hướng ngang: sang phải và sang trái
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
+            candidate_x = x + dx
+            if candidate_x >= COLS:
+                break
+            if dx == 1:
+                # Di chuyển liền kề
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                # Với bước nhảy xa: các ô trung gian phải không an toàn (nguy hiểm)
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x + step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
+            candidate_x = x - dx
+            if candidate_x < 0:
+                break
+            if dx == 1:
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x - step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+
+        # Hướng dọc: xuống và lên
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
+            candidate_y = y + dy
+            if candidate_y >= ROWS:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y + step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
+            candidate_y = y - dy
+            if candidate_y < 0:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y - step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        return neighbors
+
+    # Khởi tạo hàng đợi BFS
+    queue = deque([start])
+    came_from = {start: None}
+
+    while queue:
+        current = queue.popleft()
+
+        # Nếu tìm thấy goal, xây dựng đường đi
+        if current == goal:
+            path = [current]
+            while current in came_from and came_from[current] is not None:
+                current = came_from[current]
+                path.append(current)
+            path.reverse()
+            return path
+
+        # Thêm các ô hàng xóm vào hàng đợi
+        for neighbor in get_neighbors(current):
+            if neighbor not in came_from:  # Đảm bảo không quay lại ô đã duyệt
+                queue.append(neighbor)
+                came_from[neighbor] = current
+
+    # Nếu không tìm được đường đi
+    return None
+def beam_search(start, goal, grid, beam_width=5):
+    """
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán Beam Search.
+    Hỗ trợ di chuyển bình thường (bước = 1 ô) và nhảy xa (tối đa 4 ô).
+    Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
+    """
+    def get_neighbors(node):
+        x, y = node
+        neighbors = []
+
+        # Hướng ngang: sang phải và sang trái
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
+            candidate_x = x + dx
+            if candidate_x >= COLS:
+                break
+            if dx == 1:
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x + step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
+            candidate_x = x - dx
+            if candidate_x < 0:
+                break
+            if dx == 1:
+                if is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+            else:
+                jump_possible = True
+                for step in range(1, dx):
+                    if is_safe(x - step, y, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(candidate_x, y, grid):
+                    neighbors.append((candidate_x, y))
+                    
+        # Hướng dọc: xuống và lên
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
+            candidate_y = y + dy
+            if candidate_y >= ROWS:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y + step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
+            candidate_y = y - dy
+            if candidate_y < 0:
+                break
+            if dy == 1:
+                if is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+            else:
+                jump_possible = True
+                for step in range(1, dy):
+                    if is_safe(x, y - step, grid):
+                        jump_possible = False
+                        break
+                if jump_possible and is_safe(x, candidate_y, grid):
+                    neighbors.append((x, candidate_y))
+        return neighbors
+
+    def heuristic(node):
+        # Sử dụng khoảng cách Manhattan làm heuristic
+        return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
+
+    # Khởi tạo hàng đợi với đường đi ban đầu chỉ có start
+    queue = [[start]]
+    visited = set([start])
+
+    while queue:
+        new_queue = []
+        for path in queue:
+            current = path[-1]
+            if current == goal:
+                return path  # Trả về đường đi nếu đến được goal
+
+            neighbors = get_neighbors(current)
+            for neighbor in neighbors:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    new_path = path + [neighbor]
+                    new_queue.append(new_path)
+
+        # Sắp xếp các đường đi mới theo heuristic của nút cuối cùng
+        new_queue.sort(key=lambda p: heuristic(p[-1]))
+        # Giữ lại chỉ beam_width đường đi tốt nhất
+        queue = new_queue[:beam_width]
+
+    return None  # Không tìm được đường đi
 # Khởi tạo pygame
 mixer.init()
 pygame.init()
@@ -174,6 +386,8 @@ moving_right = False
 shoot = False
 grenade = False
 grenade_thrown = False
+# Biến lưu thuật toán được chọn
+selected_algorithm = None
 
 # Tải âm thanh
 pygame.mixer.music.load("audio/music2.mp3")
@@ -219,6 +433,10 @@ backgrounds = {
 start_img = pygame.image.load("img/start_btn.png").convert_alpha()
 exit_img = pygame.image.load("img/exit_btn.png").convert_alpha()
 restart_img = pygame.image.load("img/restart_btn.png").convert_alpha()
+# Tải hình ảnh cho các nút chọn thuật toán
+beamsearch_img = pygame.image.load("img/start_BeamSearch_btn.png").convert_alpha()
+bfs_img = pygame.image.load("img/start_BFS_btn.png").convert_alpha()
+astar_img = pygame.image.load("img/start_AStar_btn.png").convert_alpha()
 
 # Tải hình ảnh ô (tile)
 img_list = []
@@ -248,7 +466,7 @@ BLACK = (0, 0, 0)
 PINK = (235, 65, 54)
 
 # Font chữ
-font = pygame.font.SysFont("Cookie", 30)
+font = pygame.font.SysFont("Futura", 30)
 
 # Hàm vẽ văn bản
 def draw_text(text, font, text_color, x, y):
@@ -409,8 +627,6 @@ class Soldier(pygame.sprite.Sprite):
         if self.shoot_cooldown == 0:
             # Nếu ở level 1: cooldown là 20 (cả player và enemy)
             # Nếu ở level 2: cooldown của enemy là 15, player vẫn là 20
-            if self.char_type != "enemy" and self.ammo <= 0:
-                return
             self.shoot_cooldown = 15 if self.char_type == "enemy" and level >= 2 else 20
             bullet = Bullet(self.rect.centerx + (0.75 * self.rect.size[0] * self.direction), 
                             self.rect.centery, self.direction)
@@ -434,7 +650,15 @@ class Soldier(pygame.sprite.Sprite):
         if self.chasing:
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
             goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-            path = ucs(start, goal, world_data)
+                # Gọi thuật toán dựa trên lựa chọn
+            if selected_algorithm == "beam_search":
+                path = beam_search(start, goal, world_data)
+            elif selected_algorithm == "bfs":
+                path = bfs(start, goal, world_data)
+            elif selected_algorithm == "a_star":
+                path = a_star(start, goal, world_data)
+            else:
+                path = None  # Trường hợp không có thuật toán nào được chọn
 
             moving = False
             if path and len(path) > 1:
@@ -762,6 +986,11 @@ start_button = button.Button(SCREEN_WIDTH // 2 - 130, SCREEN_HEIGHT // 2 - 150, 
 exit_button = button.Button(SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT // 2 + 50, exit_img, 1)
 restart_button = button.Button(SCREEN_WIDTH // 2 - 90, SCREEN_HEIGHT // 2 - 50, restart_img, 1)
 
+# Thêm các nút chọn thuật toán với hình ảnh riêng biệt
+start_beamsearch_button = button.Button(SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 200, beamsearch_img, 1)
+start_bfs_button = button.Button(SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 100, bfs_img, 1)
+start_astar_button = button.Button(SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2, astar_img, 1)
+
 enemy_group = pygame.sprite.Group()
 bullet_group = pygame.sprite.Group()
 grenade_group = pygame.sprite.Group()
@@ -793,9 +1022,21 @@ while run:
 
     if not start_game:
         screen.fill(BG)
-        if start_button.draw(screen):
+        draw_text("CHOOSE ALGORITHM:", font, WHITE, SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 300)
+        
+        if start_beamsearch_button.draw(screen):
+            selected_algorithm = "beam_search"
             start_game = True
             start_intro = True
+        if start_bfs_button.draw(screen):
+            selected_algorithm = "bfs"
+            start_game = True
+            start_intro = True
+        if start_astar_button.draw(screen):
+            selected_algorithm = "a_star"
+            start_game = True
+            start_intro = True
+
         if exit_button.draw(screen):
             run = False
     else:
