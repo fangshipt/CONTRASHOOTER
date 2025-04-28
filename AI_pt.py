@@ -33,18 +33,17 @@ def is_safe(x, y, grid):
     if y == ROWS - 1 and val == -1:
         return False
     return True
-def beam_search(start, goal, grid, beam_width=5):
+def ucs(start, goal, grid):
     """
-    Tìm đường đi từ start đến goal trong grid bằng thuật toán Beam Search.
-    Hỗ trợ di chuyển bình thường (bước = 1 ô) và nhảy xa (tối đa 4 ô).
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán UCS.
     Trả về đường đi (danh sách các ô từ start đến goal) hoặc None nếu không tìm được.
     """
     def get_neighbors(node):
+        # Giữ nguyên hàm get_neighbors từ code gốc
         x, y = node
         neighbors = []
-
         # Hướng ngang: sang phải và sang trái
-        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên phải
+        for dx in range(1, 5):
             candidate_x = x + dx
             if candidate_x >= COLS:
                 break
@@ -59,7 +58,7 @@ def beam_search(start, goal, grid, beam_width=5):
                         break
                 if jump_possible and is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
-        for dx in range(1, 5):  # xét từ 1 đến 4 ô bên trái
+        for dx in range(1, 5):
             candidate_x = x - dx
             if candidate_x < 0:
                 break
@@ -74,9 +73,8 @@ def beam_search(start, goal, grid, beam_width=5):
                         break
                 if jump_possible and is_safe(candidate_x, y, grid):
                     neighbors.append((candidate_x, y))
-                    
         # Hướng dọc: xuống và lên
-        for dy in range(1, 5):  # xét từ 1 đến 4 ô xuống
+        for dy in range(1, 5):
             candidate_y = y + dy
             if candidate_y >= ROWS:
                 break
@@ -91,7 +89,7 @@ def beam_search(start, goal, grid, beam_width=5):
                         break
                 if jump_possible and is_safe(x, candidate_y, grid):
                     neighbors.append((x, candidate_y))
-        for dy in range(1, 5):  # xét từ 1 đến 4 ô lên
+        for dy in range(1, 5):
             candidate_y = y - dy
             if candidate_y < 0:
                 break
@@ -108,35 +106,41 @@ def beam_search(start, goal, grid, beam_width=5):
                     neighbors.append((x, candidate_y))
         return neighbors
 
-    def heuristic(node):
-        # Sử dụng khoảng cách Manhattan làm heuristic
-        return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
+    # Sử dụng hàng đợi ưu tiên để ưu tiên chi phí thấp nhất
+    open_set = [(0, start)]  # (g_score, node)
+    came_from = {}
+    g_score = {start: 0}
+    visited = set()
 
-    # Khởi tạo hàng đợi với đường đi ban đầu chỉ có start
-    queue = [[start]]
-    visited = set([start])
+    while open_set:
+        current_g, current = heapq.heappop(open_set)
+        if current == goal:
+            # Xây dựng lại đường đi
+            path = [current]
+            while current in came_from:
+                current = came_from[current]
+                path.append(current)
+            path.reverse()
+            return path
 
-    while queue:
-        new_queue = []
-        for path in queue:
-            current = path[-1]
-            if current == goal:
-                return path  # Trả về đường đi nếu đến được goal
+        if current in visited:
+            continue
+        visited.add(current)
 
-            neighbors = get_neighbors(current)
-            for neighbor in neighbors:
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    new_path = path + [neighbor]
-                    new_queue.append(new_path)
+        for neighbor in get_neighbors(current):
+            dx = abs(neighbor[0] - current[0])
+            dy = abs(neighbor[1] - current[1])
+            move_cost = dx if dx > dy else dy  # Chi phí di chuyển
+            if move_cost == 0:
+                move_cost = 1
+            tentative_g_score = g_score[current] + move_cost
 
-        # Sắp xếp các đường đi mới theo heuristic của nút cuối cùng
-        new_queue.sort(key=lambda p: heuristic(p[-1]))
-        # Giữ lại chỉ beam_width đường đi tốt nhất
-        queue = new_queue[:beam_width]
-
-    return None  # Không tìm được đường đi
-
+            if tentative_g_score < g_score.get(neighbor, float("inf")):
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                heapq.heappush(open_set, (tentative_g_score, neighbor))
+    
+    return None
 
 # Khởi tạo pygame
 mixer.init()
@@ -430,7 +434,7 @@ class Soldier(pygame.sprite.Sprite):
         if self.chasing:
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
             goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-            path = beam_search(start, goal, world_data)
+            path = ucs(start, goal, world_data)
 
             moving = False
             if path and len(path) > 1:
