@@ -260,18 +260,22 @@ def bfs(start, goal, grid):
 
     # Nếu không tìm được đường đi
     return None
-def heuristic(state, goal):
+
+def heuristic(state, goal, distance):
     """
     Tính heuristic (khoảng cách Manhattan) từ trạng thái hiện tại đến goal.
+    Thêm chi phí cho nhảy xa để cân bằng, nhưng không ngăn cản nhảy khi cần.
     """
-    return abs(state[0] - goal[0]) + abs(state[1] - goal[1])
+    manhattan_distance = abs(state[0] - goal[0]) + abs(state[1] - goal[1])
+    jump_cost = 3 if distance > 1 else 1  # Chi phí nhảy xa vừa phải
+    return manhattan_distance + jump_cost
 
 def and_or_search(start, goal, grid, max_jump=2, max_depth=100):
     """
     AND-OR search trên grid để tìm đường đi từ start đến goal.
     Hỗ trợ di chuyển bình thường (1 ô) và nhảy xa (2–max_jump ô) theo hàng ngang và dọc.
-    Sử dụng OR nodes (chọn một hướng di chuyển) và AND nodes (điều kiện nhảy), với heuristic để ưu tiên.
-    
+    Cho phép nhảy qua nước, không gian trống, hố khi cần để tiếp cận goal.
+
     Args:
         start (tuple): Tọa độ bắt đầu (x, y).
         goal (tuple): Tọa độ đích (x, y).
@@ -286,7 +290,7 @@ def and_or_search(start, goal, grid, max_jump=2, max_depth=100):
         x, y = state
         neighbors = []
 
-        # Tất cả các hướng: lên, xuống, trái, phải (đảm bảo cân bằng)
+        # Tất cả các hướng: lên, xuống, trái, phải
         directions = [
             (dx, dy) for dx in range(-max_jump, max_jump + 1) for dy in range(-max_jump, max_jump + 1)
             if (dx != 0 or dy != 0) and abs(dx) <= max_jump and abs(dy) <= max_jump
@@ -298,7 +302,7 @@ def and_or_search(start, goal, grid, max_jump=2, max_depth=100):
             distance = abs(dx) if abs(dx) > abs(dy) else abs(dy)
             if distance == 1:
                 if is_safe(candidate_x, candidate_y, grid):
-                    neighbors.append((candidate_x, candidate_y))
+                    neighbors.append((candidate_x, candidate_y, distance))
             else:
                 jump_possible = True
                 for step in range(1, distance):
@@ -308,7 +312,12 @@ def and_or_search(start, goal, grid, max_jump=2, max_depth=100):
                         jump_possible = False
                         break
                 if jump_possible and is_safe(candidate_x, candidate_y, grid):
-                    neighbors.append((candidate_x, candidate_y))
+                    # Ưu tiên nhảy lên (hướng dọc lên) nếu cần
+                    if dy < 0 and (dx == 0 or abs(dy) > abs(dx)):
+                        neighbors.insert(0, (candidate_x, candidate_y, distance))
+                    else:
+                        neighbors.append((candidate_x, candidate_y, distance))
+
         return neighbors
 
     def and_or_recursive(state, visited, came_from, depth=0):
@@ -337,12 +346,13 @@ def and_or_search(start, goal, grid, max_jump=2, max_depth=100):
         if not neighbors:
             return None
 
-        # Sắp xếp neighbor theo heuristic để ưu tiên hướng gần goal
-        neighbors.sort(key=lambda n: heuristic(n, goal))
+        # Sắp xếp neighbor theo heuristic
+        neighbors.sort(key=lambda n: heuristic((n[0], n[1]), goal, n[2]))
         for neighbor in neighbors:
-            if neighbor not in visited:
-                came_from[neighbor] = state
-                result = and_or_recursive(neighbor, visited, came_from, depth + 1)
+            next_state = (neighbor[0], neighbor[1])
+            if next_state not in visited:
+                came_from[next_state] = state
+                result = and_or_recursive(next_state, visited, came_from, depth + 1)
                 if result is not None:
                     return result
 

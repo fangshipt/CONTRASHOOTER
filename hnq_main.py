@@ -7,7 +7,7 @@ import csv
 import button
 import math
 from setting import *
-from algorithm import *
+from hnq_test import *
 
 # Khởi tạo pygame
 mixer.init()
