@@ -1,4 +1,5 @@
 import csv
+import heapq
 from setting import ROWS, COLS
 def read_level_data(filename):
     """
@@ -321,7 +322,6 @@ def beam_search(start, goal, grid, beam_width=5):
     def heuristic(node):
         # Sử dụng khoảng cách Manhattan làm heuristic
         return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
-
     # Khởi tạo hàng đợi với đường đi ban đầu chỉ có start
     queue = [[start]]
     visited = set([start])
@@ -469,4 +469,208 @@ def backtracking_search(start, goal, grid):
             new_path = path + [move]
             stack.append((move, new_path))
             
+    return None # Không tìm thấy đường đi
+def ida_star_search(start, goal, grid): # 'goal' ở đây sẽ được hàm heuristic lồng sử dụng
+    """
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán IDA*.
+    Sử dụng logic get_neighbors tương tự A*, BFS, Beam Search.
+    Chi phí di chuyển: liền kề = 1, nhảy = khoảng cách.
+    Heuristic: Manhattan distance (sử dụng hàm heuristic lồng bên trong).
+    """
+    def heuristic(node): 
+        return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
+    def get_neighbors_with_cost_ida(node):
+        # ... (Nội dung hàm này giữ nguyên như phiên bản đúng trước đó)
+        x, y = node
+        neighbors_data = []
+        # Hướng ngang
+        for dx_direction in [1, -1]: 
+            for dist in range(1, 5): 
+                candidate_x = x + dx_direction * dist
+                if not (0 <= candidate_x < COLS): break 
+                cost = dist 
+                if dist == 1: 
+                    if is_safe(candidate_x, y, grid): neighbors_data.append(((candidate_x, y), cost))
+                else: 
+                    jump_possible = True
+                    for step in range(1, dist): 
+                        intermediate_x = x + dx_direction * step
+                        if is_safe(intermediate_x, y, grid): jump_possible = False; break
+                    if jump_possible and is_safe(candidate_x, y, grid): neighbors_data.append(((candidate_x, y), cost))
+        # Hướng dọc
+        for dy_direction in [1, -1]: 
+            for dist in range(1, 5):  
+                candidate_y = y + dy_direction * dist
+                if not (0 <= candidate_y < ROWS): break
+                cost = dist
+                if dist == 1: 
+                    if is_safe(x, candidate_y, grid): neighbors_data.append(((x, candidate_y), cost))
+                else: 
+                    jump_possible = True
+                    for step in range(1, dist):
+                        intermediate_y = y + dy_direction * step
+                        if is_safe(x, intermediate_y, grid): jump_possible = False; break
+                    if jump_possible and is_safe(x, candidate_y, grid): neighbors_data.append(((x, candidate_y), cost))
+        return neighbors_data
+
+
+    # Hàm đệ quy cho IDA*
+    def search_recursive_ida(path, g_cost, current_bound_val):
+        current_node = path[-1]
+        
+        # SỬA Ở ĐÂY: Gọi heuristic(node)
+        h_val = heuristic(current_node) 
+        f_cost = g_cost + h_val
+
+        if f_cost > current_bound_val:
+            return f_cost, None 
+
+        if current_node == goal: # 'goal' ở đây là tham số của ida_star_search
+            return "FOUND", path
+
+        min_exceeded_f_cost = float('inf')
+
+        # Sắp xếp neighbors theo heuristic
+        # SỬA Ở ĐÂY: Gọi heuristic(node) cho key của sorted
+        sorted_neighbors_data = sorted(
+            get_neighbors_with_cost_ida(current_node),
+            key=lambda item: heuristic(item[0]) # item[0] là neighbor_node
+        )
+
+        for neighbor_node, move_cost in sorted_neighbors_data:
+            if neighbor_node not in path: 
+                path.append(neighbor_node)
+                
+                result_status, result_path = search_recursive_ida(path, g_cost + move_cost, current_bound_val)
+                
+                if result_status == "FOUND":
+                    return "FOUND", result_path
+                
+                if isinstance(result_status, (int, float)) and result_status < min_exceeded_f_cost:
+                     min_exceeded_f_cost = result_status
+                
+                path.pop() 
+
+        return min_exceeded_f_cost, None
+
+    # --- Phần chính của IDA* ---
+    if not is_safe(start[0], start[1], grid) or not is_safe(goal[0], goal[1], grid):
+        return None 
+
+    # SỬA Ở ĐÂY: Gọi heuristic(node)
+    active_bound = heuristic(start)
+    
+    while True:
+        # print(f"IDA* trying bound: {active_bound}") # Debugging
+        
+        path_for_this_iteration = [start] 
+        status, final_path_nodes = search_recursive_ida(path_for_this_iteration, 0, active_bound)
+
+        if status == "FOUND":
+            return final_path_nodes 
+        
+        if not isinstance(status, (int, float)) or status == float('inf'):
+            return None
+        
+        active_bound = status
+def ucs_search(start, goal, grid):
+    """
+    Tìm đường đi từ start đến goal trong grid bằng thuật toán Uniform Cost Search (UCS).
+    Ưu tiên mở rộng nút có chi phí g(n) (tổng chi phí từ start đến n) thấp nhất.
+    Chi phí di chuyển: liền kề = 1, nhảy = khoảng cách.
+    """
+
+    def get_neighbors_with_cost_ucs(node):
+        """
+        Lấy các hàng xóm hợp lệ và chi phí di chuyển đến chúng.
+        Tương tự như get_neighbors_with_cost_ida nhưng dành cho UCS.
+        Trả về list các tuple: ((neighbor_x, neighbor_y), cost)
+        """
+        x, y = node
+        neighbors_data = []
+
+        # Hướng ngang: sang phải và sang trái
+        for dx_direction in [1, -1]: 
+            for dist in range(1, 5): 
+                candidate_x = x + dx_direction * dist
+                
+                if not (0 <= candidate_x < COLS): 
+                    break 
+                cost = dist 
+                if dist == 1: 
+                    if is_safe(candidate_x, y, grid):
+                        neighbors_data.append(((candidate_x, y), cost))
+                else: 
+                    jump_possible = True
+                    for step in range(1, dist): 
+                        intermediate_x = x + dx_direction * step
+                        if is_safe(intermediate_x, y, grid): 
+                            jump_possible = False; break
+                    if jump_possible and is_safe(candidate_x, y, grid): 
+                        neighbors_data.append(((candidate_x, y), cost))
+                        
+        # Hướng dọc: xuống và lên
+        for dy_direction in [1, -1]: 
+            for dist in range(1, 5):  
+                candidate_y = y + dy_direction * dist
+                if not (0 <= candidate_y < ROWS): break
+                cost = dist
+                if dist == 1: 
+                    if is_safe(x, candidate_y, grid):
+                        neighbors_data.append(((x, candidate_y), cost))
+                else: 
+                    jump_possible = True
+                    for step in range(1, dist):
+                        intermediate_y = y + dy_direction * step
+                        if is_safe(x, intermediate_y, grid): 
+                            jump_possible = False; break
+                    if jump_possible and is_safe(x, candidate_y, grid): 
+                        neighbors_data.append(((x, candidate_y), cost))
+        return neighbors_data
+
+    # --- Phần chính của UCS ---
+    if not is_safe(start[0], start[1], grid) or not is_safe(goal[0], goal[1], grid):
+        return None 
+
+    # Hàng đợi ưu tiên (min-heap) lưu trữ (tổng_chi_phí, nút)
+    # Tổng chi phí được dùng để ưu tiên, nên nó đứng đầu tuple.
+    open_set_pq = [] # Priority Queue
+    heapq.heappush(open_set_pq, (0, start)) # (cost_from_start, node)
+
+    # Dictionary để lưu đường đi ngược từ nút về start
+    came_from = {start: None}
+    
+    # Dictionary để lưu chi phí thấp nhất đã biết từ start đến một nút
+    cost_so_far = {start: 0}
+
+    while open_set_pq:
+        current_cost, current_node = heapq.heappop(open_set_pq)
+
+        # Nếu đã tìm thấy đường đi đến goal, và đường đi này có chi phí cao hơn
+        # một đường đi khác đã được xử lý và cập nhật trong cost_so_far,
+        # thì bỏ qua (tuy nhiên, với UCS chuẩn, lần đầu tiên pop goal ra khỏi PQ là tối ưu)
+        # Dòng này thường không cần thiết nếu không có heuristic và lần đầu pop goal là tối ưu.
+        # if current_cost > cost_so_far.get(current_node, float('inf')):
+        #    continue
+
+        if current_node == goal:
+            # Xây dựng lại đường đi từ goal về start
+            path = [current_node]
+            temp_node = current_node
+            while came_from[temp_node] is not None:
+                temp_node = came_from[temp_node]
+                path.append(temp_node)
+            path.reverse()
+            return path
+
+        for neighbor_node, move_cost in get_neighbors_with_cost_ucs(current_node):
+            new_cost = cost_so_far[current_node] + move_cost
+            
+            # Nếu chưa từng đến neighbor này, hoặc tìm thấy đường đi tốt hơn đến nó
+            if neighbor_node not in cost_so_far or new_cost < cost_so_far[neighbor_node]:
+                cost_so_far[neighbor_node] = new_cost
+                # Ưu tiên trong hàng đợi là new_cost (tổng chi phí từ start)
+                heapq.heappush(open_set_pq, (new_cost, neighbor_node))
+                came_from[neighbor_node] = current_node
+                
     return None # Không tìm thấy đường đi

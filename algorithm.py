@@ -31,16 +31,6 @@ def is_safe(x, y, grid):
         return False
     return True
 
-def can_jump_over(x, y, grid):
-    """
-    Kiểm tra ô (x,y) có thể nhảy qua được hay không.
-    Có thể nhảy qua nếu:
-      - Ô là không gian trống (giả sử -2), nước (9, 10), hoặc hố (-1).
-    """
-    if not (0 <= x < COLS and 0 <= y < ROWS):
-        return False
-    val = grid[y][x]
-    return val in (-2, 9, 10, -1)  # Có thể nhảy qua không gian trống, nước, hố
 
 def a_star(start, goal, grid):
     """
@@ -260,100 +250,7 @@ def bfs(start, goal, grid):
 
     # Nếu không tìm được đường đi
     return None
-def heuristic(state, goal):
-    """
-    Tính heuristic (khoảng cách Manhattan) từ trạng thái hiện tại đến goal.
-    """
-    return abs(state[0] - goal[0]) + abs(state[1] - goal[1])
 
-def and_or_search(start, goal, grid, max_jump=2, max_depth=100):
-    """
-    AND-OR search trên grid để tìm đường đi từ start đến goal.
-    Hỗ trợ di chuyển bình thường (1 ô) và nhảy xa (2–max_jump ô) theo hàng ngang và dọc.
-    Sử dụng OR nodes (chọn một hướng di chuyển) và AND nodes (điều kiện nhảy), với heuristic để ưu tiên.
-    
-    Args:
-        start (tuple): Tọa độ bắt đầu (x, y).
-        goal (tuple): Tọa độ đích (x, y).
-        grid (list): Lưới trò chơi (ma trận 2D).
-        max_jump (int): Độ dài tối đa của bước nhảy (mặc định: 2).
-        max_depth (int): Độ sâu tối đa để tránh tràn ngăn xếp (mặc định: 100).
-
-    Returns:
-        list: Danh sách các ô (tọa độ) từ start đến goal, hoặc None nếu không tìm được.
-    """
-    def get_neighbors(state):
-        x, y = state
-        neighbors = []
-
-        # Tất cả các hướng: lên, xuống, trái, phải (đảm bảo cân bằng)
-        directions = [
-            (dx, dy) for dx in range(-max_jump, max_jump + 1) for dy in range(-max_jump, max_jump + 1)
-            if (dx != 0 or dy != 0) and abs(dx) <= max_jump and abs(dy) <= max_jump
-        ]
-        for dx, dy in directions:
-            candidate_x, candidate_y = x + dx, y + dy
-            if not (0 <= candidate_x < COLS and 0 <= candidate_y < ROWS):
-                continue
-            distance = abs(dx) if abs(dx) > abs(dy) else abs(dy)
-            if distance == 1:
-                if is_safe(candidate_x, candidate_y, grid):
-                    neighbors.append((candidate_x, candidate_y))
-            else:
-                jump_possible = True
-                for step in range(1, distance):
-                    check_x = x + (dx * step // distance)
-                    check_y = y + (dy * step // distance)
-                    if not can_jump_over(check_x, check_y, grid):
-                        jump_possible = False
-                        break
-                if jump_possible and is_safe(candidate_x, candidate_y, grid):
-                    neighbors.append((candidate_x, candidate_y))
-        return neighbors
-
-    def and_or_recursive(state, visited, came_from, depth=0):
-        """
-        Đệ quy AND-OR search:
-        - OR node: Chọn neighbor gần goal nhất để tiếp tục.
-        - AND node: Đảm bảo điều kiện nhảy được thỏa mãn (xử lý trong get_neighbors).
-        """
-        if depth > max_depth:
-            return None
-
-        if state == goal:
-            path = [state]
-            current = state
-            while current in came_from and came_from[current] is not None:
-                current = came_from[current]
-                path.append(current)
-            path.reverse()
-            return path
-
-        if state in visited:
-            return None
-
-        visited.add(state)
-        neighbors = get_neighbors(state)
-        if not neighbors:
-            return None
-
-        # Sắp xếp neighbor theo heuristic để ưu tiên hướng gần goal
-        neighbors.sort(key=lambda n: heuristic(n, goal))
-        for neighbor in neighbors:
-            if neighbor not in visited:
-                came_from[neighbor] = state
-                result = and_or_recursive(neighbor, visited, came_from, depth + 1)
-                if result is not None:
-                    return result
-
-        return None
-
-    if not is_safe(start[0], start[1], grid) or not is_safe(goal[0], goal[1], grid):
-        return None
-
-    visited = set()
-    came_from = {start: None}
-    return and_or_recursive(start, visited, came_from)
 
 def beam_search(start, goal, grid, beam_width=5):
     """

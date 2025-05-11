@@ -279,8 +279,8 @@ class Soldier(pygame.sprite.Sprite):
                 path = beam_search(start, goal, world_data)
             elif selected_algorithm == "BFS":
                 path = bfs(start, goal, world_data)
-            elif selected_algorithm == "Backtracking":
-                path = backtracking_search(start, goal, world_data)
+            elif selected_algorithm == "A*":
+                path = a_star(start, goal, world_data)
             else:
                 path = None  # Trường hợp không có thuật toán nào được chọn
 
@@ -729,7 +729,7 @@ while run:
             start_intro = True
             selection_time = pygame.time.get_ticks()
         if start_astar_button.draw(screen):
-            selected_algorithm = "Backtracking"
+            selected_algorithm = "A*"
             start_intro = True
             selection_time = pygame.time.get_ticks()
         if exit_button.draw(screen):
