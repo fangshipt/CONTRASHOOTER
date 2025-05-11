@@ -9,7 +9,6 @@ import math
 from setting import *
 from hnq_test import *
 
-# Khởi tạo pygame
 mixer.init()
 pygame.init()
 
@@ -18,7 +17,7 @@ pygame.display.set_caption("Shooter Game")
 
 clock = pygame.time.Clock()
 
-# Tải âm thanh
+
 pygame.mixer.music.load("audio/music2.mp3")
 pygame.mixer.music.set_volume(0.3)
 pygame.mixer.music.play(-1, 0.0, 5000)
@@ -29,20 +28,17 @@ shot_fx.set_volume(0.5)
 grenade_fx = pygame.mixer.Sound("audio/grenade.wav")
 grenade_fx.set_volume(0.7)
 
-# Tải hình ảnh nền
-# Tải hình ảnh nền cho level 1
+
 pine1_level1_img = pygame.image.load("img/Background1/pine1.png").convert_alpha()
 pine2_level1_img = pygame.image.load("img/Background1/pine2.png").convert_alpha()
 mountain_level1_img = pygame.image.load("img/Background1/mountain.png").convert_alpha()
 sky_level1_img = pygame.image.load("img/Background1/sky_cloud.png").convert_alpha()
 
-# Tải hình ảnh nền cho level 2 trở đi
 pine1_level2_img = pygame.image.load("img/Background2/pine1.png").convert_alpha()
 pine2_level2_img = pygame.image.load("img/Background2/pine2.png").convert_alpha()
 mountain_level2_img = pygame.image.load("img/Background2/mountain.png").convert_alpha()
 sky_level2_img = pygame.image.load("img/Background2/sky_cloud.png").convert_alpha()
 
-# Lưu các bộ background vào một dictionary để dễ quản lý
 backgrounds = {
     "level1": {
         "sky": sky_level1_img,
@@ -58,16 +54,18 @@ backgrounds = {
     }
 }
 
-# Tải hình ảnh nút
+
 start_img = pygame.image.load("img/start_btn.png").convert_alpha()
 exit_img = pygame.image.load("img/exit_btn.png").convert_alpha()
 restart_img = pygame.image.load("img/restart_btn.png").convert_alpha()
-# Tải hình ảnh cho các nút chọn thuật toán
 beamsearch_img = pygame.image.load("img/start_BeamSearch_btn.png").convert_alpha()
 bfs_img = pygame.image.load("img/start_BFS_btn.png").convert_alpha()
 astar_img = pygame.image.load("img/start_AStar_btn.png").convert_alpha()
+backtracking_img = pygame.image.load("img/start_Backtracking_btn.png").convert_alpha()
+ucssearch_img = pygame.image.load("img/start_UCSSearch_btn.png").convert_alpha()
+idastar_img = pygame.image.load("img/start_IDAStar_btn.png").convert_alpha()
 
-# Tải hình ảnh ô (tile)
+
 img_list = []
 for x in range(TILE_TYPES):
     img = pygame.image.load(f"img/tile/{x}.png")
@@ -86,19 +84,16 @@ item_boxes = {
     "Grenade": grenade_box_img
 }
 
-# Font chữ
-font = pygame.font.SysFont("Courier New", 25)
-small_font = pygame.font.SysFont('Courier New', 20)  
 
-# Hàm vẽ văn bản
+font = pygame.font.SysFont("Courier New", 25)
+small_font = pygame.font.SysFont('Courier New', 20)
+
 def draw_text(text, font, text_color, x, y):
     img = font.render(text, True, text_color)
     screen.blit(img, (x, y))
 
-# Hàm vẽ nền
 def draw_bg():
     screen.fill(BG)
-    # Chọn bộ background dựa trên level
     bg_set = backgrounds["level2_up"] if level >= 2 else backgrounds["level1"]
     
     width = bg_set["sky"].get_width()
@@ -108,7 +103,6 @@ def draw_bg():
         screen.blit(bg_set["pine1"], ((x * width) - bg_scroll * 0.7, SCREEN_HEIGHT - bg_set["pine1"].get_height() - 150))
         screen.blit(bg_set["pine2"], ((x * width) - bg_scroll * 0.8, SCREEN_HEIGHT - bg_set["pine2"].get_height()))
 
-# Hàm reset level
 def reset_level():
     enemy_group.empty()
     bullet_group.empty()
@@ -125,7 +119,6 @@ def reset_level():
         data.append(r)
     return data
 
-# Lớp Soldier (bao gồm cả player và enemy)
 class Soldier(pygame.sprite.Sprite):
     def __init__(self, char_type, x, y, scale, speed, ammo, grenades):
         super().__init__()
@@ -154,7 +147,6 @@ class Soldier(pygame.sprite.Sprite):
         self.idling_counter = 0
         self.grenade_time = pygame.time.get_ticks()
 
-        # Tải animation
         animation_types = ["Idle", "Run", "Jump", "Death"]
         for animation in animation_types:
             temp_list = []
@@ -247,8 +239,6 @@ class Soldier(pygame.sprite.Sprite):
     def shoot(self):
         global level
         if self.shoot_cooldown == 0:
-            # Nếu ở level 1: cooldown là 20 (cả player và enemy)
-            # Nếu ở level 2: cooldown của enemy là 15, player vẫn là 20
             if self.char_type != "enemy" and self.ammo <= 0:
                 return
             self.shoot_cooldown = 15 if self.char_type == "enemy" and level >= 2 else 20
@@ -274,15 +264,20 @@ class Soldier(pygame.sprite.Sprite):
         if self.chasing:
             start = (self.rect.centerx // TILE_SIZE, self.rect.centery // TILE_SIZE)
             goal = (player.rect.centerx // TILE_SIZE, player.rect.centery // TILE_SIZE)
-                # Gọi thuật toán dựa trên lựa chọn
             if selected_algorithm == "Beam Search":
                 path = beam_search(start, goal, world_data)
             elif selected_algorithm == "BFS":
                 path = bfs(start, goal, world_data)
             elif selected_algorithm == "A*":
-                path = and_or_search(start, goal, world_data)
+                path = ucs_search(start, goal, world_data)
+            elif selected_algorithm == "Backtracking":
+                path = None
+            elif selected_algorithm == "UCS Search":
+                path = ucs_search(start, goal, world_data)
+            elif selected_algorithm == "IDA*":
+                path = None
             else:
-                path = None  # Trường hợp không có thuật toán nào được chọn
+                path = None
 
             moving = False
             if path and len(path) > 1:
@@ -310,7 +305,6 @@ class Soldier(pygame.sprite.Sprite):
 
                 if self.vision.colliderect(player.rect):
                     self.shoot()
-                    # Chỉ ở level 2 trở lên, enemy mới ném lựu đạn
                     if level >= 2:
                         now_time = pygame.time.get_ticks()
                         if distance_to_player < TILE_SIZE * 5 and self.grenades > 0:
@@ -361,7 +355,6 @@ class Soldier(pygame.sprite.Sprite):
     def draw(self):
         screen.blit(pygame.transform.flip(self.image, self.flip, False), self.rect)
 
-# Lớp ItemBox
 class ItemBox(pygame.sprite.Sprite):
     def __init__(self, item_type, x, y):
         super().__init__()
@@ -383,7 +376,6 @@ class ItemBox(pygame.sprite.Sprite):
                 player.grenades += 3
             self.kill()
 
-# Lớp HealthBar
 class HealthBar():
     def __init__(self, x, y, health, max_health):
         self.x = x
@@ -398,7 +390,6 @@ class HealthBar():
         pygame.draw.rect(screen, RED, (self.x, self.y, 150, 20))
         pygame.draw.rect(screen, GREEN, (self.x, self.y, 150 * ratio, 20))
 
-# Lớp Bullet
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
@@ -423,7 +414,6 @@ class Bullet(pygame.sprite.Sprite):
                     enemy.health -= 25
                     self.kill()
 
-# Lớp Grenade
 class Grenade(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
@@ -473,7 +463,6 @@ class Grenade(pygame.sprite.Sprite):
                    abs(self.rect.centery - enemy.rect.centery) < TILE_SIZE * 2:
                     enemy.health -= 50
 
-# Lớp World
 class World():
     def __init__(self):
         self.obstacle_list = []
@@ -501,7 +490,6 @@ class World():
                         player = Soldier("player", x * TILE_SIZE, y * TILE_SIZE, 1.65, 5, 20, 5)
                         health_bar = HealthBar(10, 10, player.health, player.health)
                     elif tile == 16:
-                        # Tốc độ enemy phụ thuộc vào level
                         enemy_speed = 2 if current_level == 1 else 3.5
                         enemy = Soldier("enemy", x * TILE_SIZE, y * TILE_SIZE, 1.65, enemy_speed, 20, 5)
                         enemy_group.add(enemy)
@@ -524,7 +512,6 @@ class World():
             tile[1][0] += screen_scroll
             screen.blit(tile[0], tile[1])
 
-# Các lớp hỗ trợ khác
 class Decoration(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
         super().__init__()
@@ -602,57 +589,97 @@ class ScreenFade():
             fade_complete = True
         return fade_complete
 
-# Khởi tạo các đối tượng
 intro_fade = ScreenFade(1, BLACK, 4)
 death_fade = ScreenFade(2, PINK, 4)
 
 restart_button = button.Button(SCREEN_WIDTH // 2 - 90, SCREEN_HEIGHT // 2 - 50, restart_img, 1)
-# Kích thước
-btn_w      = beamsearch_img.get_width()
-btn_h      = beamsearch_img.get_height()
-exit_w     = exit_img.get_width()
-exit_h     = exit_img.get_height()
 
-# Tổng chiều cao nhóm
+
+column_spacing = 50  
+row_spacing = 20     
+exit_spacing = 40    
+
+# Lấy kích thước của các nút
+beam_w = beamsearch_img.get_width()
+beam_h = beamsearch_img.get_height()
+bfs_w = bfs_img.get_width()
+bfs_h = bfs_img.get_height()
+astar_w = astar_img.get_width()
+astar_h = astar_img.get_height()
+backtracking_w = backtracking_img.get_width()
+backtracking_h = backtracking_img.get_height()
+ucssearch_w = ucssearch_img.get_width()
+ucssearch_h = ucssearch_img.get_height()
+idastar_w = idastar_img.get_width()
+idastar_h = idastar_img.get_height()
+exit_w = exit_img.get_width()
+exit_h = exit_img.get_height()
+
+
+column1_width = max(beam_w, bfs_w)
+column2_width = max(astar_w, backtracking_w)
+column3_width = max(ucssearch_w, idastar_w)
+
+
+total_width = column1_width + column2_width + column3_width + 2 * column_spacing
+
+
+start_x = (SCREEN_WIDTH - total_width) // 2
+
+# Tính chiều cao của hàng (dựa trên nút cao nhất trong mỗi hàng)
+row1_height = max(beam_h, astar_h, ucssearch_h)
+row2_height = max(bfs_h, backtracking_h, idastar_h)
+
+# Tính tổng chiều cao của nhóm (bao gồm 2 hàng nút và nút Exit)
 group_height = (
-    3 * btn_h           # 3 nút thuật toán
-  + 2 * spacing         # 2 gap giữa 3 nút
-  + exit_spacing        # gap trước nút Exit
-  + exit_h              # chiều cao nút Exit
+    row1_height + row2_height +  # 2 hàng nút
+    row_spacing +               # Khoảng cách giữa 2 hàng
+    exit_spacing +              # Khoảng cách trước nút Exit
+    exit_h                      # Chiều cao nút Exit
 )
 
 # Căn dọc giữa màn hình
 start_y = (SCREEN_HEIGHT - group_height) // 2
-# Căn ngang: mỗi nút tự tính để đảm bảo căn giữa theo ảnh của nó
-beam_x   = (SCREEN_WIDTH - btn_w)  // 2
-bfs_x    = beam_x
-astar_x  = beam_x
-exit_x   = (SCREEN_WIDTH - exit_w) // 2
 
+# Tọa độ x cho từng cột (căn giữa trong cột)
+column1_x = start_x
+column2_x = column1_x + column1_width + column_spacing
+column3_x = column2_x + column2_width + column_spacing
+
+# Tọa độ x cho từng nút (căn giữa trong cột của nó)
+beam_x = column1_x + (column1_width - beam_w) // 2
+bfs_x = column1_x + (column1_width - bfs_w) // 2
+astar_x = column2_x + (column2_width - astar_w) // 2
+backtracking_x = column2_x + (column2_width - backtracking_w) // 2
+ucssearch_x = column3_x + (column3_width - ucssearch_w) // 2
+idastar_x = column3_x + (column3_width - idastar_w) // 2
+exit_x = (SCREEN_WIDTH - exit_w) // 2
+
+# Tọa độ y cho các hàng
+row1_y = start_y
+row2_y = row1_y + row1_height + row_spacing
+exit_y = row2_y + row2_height + exit_spacing
+
+# Khởi tạo các nút
+start_beamsearch_button = button.Button(beam_x, row1_y, beamsearch_img, 1)
+start_bfs_button = button.Button(bfs_x, row2_y, bfs_img, 1)
+start_astar_button = button.Button(astar_x, row1_y, astar_img, 1)
+start_backtracking_button = button.Button(backtracking_x, row2_y, backtracking_img, 1)
+start_ucssearch_button = button.Button(ucssearch_x, row1_y, ucssearch_img, 1)
+start_idastar_button = button.Button(idastar_x, row2_y, idastar_img, 1)
+exit_button = button.Button(exit_x, exit_y, exit_img, 1)
+
+# Khởi tạo nút Exit trong game
 exit_img_menu = exit_img
-
-# Tạo image thu nhỏ cho in-game exit (ở đây 50% kích thước gốc)
 in_game_exit_scale = 0.5
 exit_img_game = pygame.transform.rotozoom(exit_img_menu, 0, in_game_exit_scale)
-
-
-# --- Khởi tạo ---
-start_beamsearch_button = button.Button(beam_x,  start_y,                            beamsearch_img, 1)
-start_bfs_button        = button.Button(bfs_x,   start_y + (btn_h + spacing)*1,     bfs_img,         1)
-start_astar_button      = button.Button(astar_x, start_y + (btn_h + spacing)*2,     astar_img,       1)
-exit_button = button.Button(
-    SCREEN_WIDTH//2 - exit_img_menu.get_width()//2,
-    start_y + 3*(btn_h+spacing) + exit_spacing,
-    exit_img_menu,
-    1
-)
-
 in_game_exit_btn = button.Button(
-    SCREEN_WIDTH - exit_img_game.get_width() - 10,  # cách mép phải 10px
-    60,                                            # cách mép trên 50px
+    SCREEN_WIDTH - exit_img_game.get_width() - 10,
+    60,
     exit_img_game,
     1
 )
+
 enemy_group = pygame.sprite.Group()
 bullet_group = pygame.sprite.Group()
 grenade_group = pygame.sprite.Group()
@@ -662,7 +689,6 @@ decoration_group = pygame.sprite.Group()
 water_group = pygame.sprite.Group()
 exit_group = pygame.sprite.Group()
 
-# Tải dữ liệu level 1 ban đầu
 world_data = []
 for row in range(ROWS):
     r = [-1] * COLS
@@ -677,46 +703,32 @@ with open(f"level{level}_data.csv", newline="") as csvfile:
 world = World()
 player, health_bar = world.process_data(world_data, level)
 
-# Vòng lặp chính
 run = True
 while run:
     clock.tick(FPS)
 
-    # 1) Nếu đang INTRO, ưu tiên vẽ intro overlay
     if start_intro:
         screen.fill(BG)
-        # (Bạn có thể vẽ background menu mờ phía sau nếu muốn)
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
-        screen.blit(overlay, (0,0))
+        screen.blit(overlay, (0, 0))
         info_text = f"Selected: {selected_algorithm}"
         info_w, info_h = font.size(info_text)
-        # x = giữa màn hình – nửa rộng của info
-        info_x = SCREEN_WIDTH  // 2 - info_w // 2
-        # y = giữa màn hình – nửa cao của info
+        info_x = SCREEN_WIDTH // 2 - info_w // 2
         info_y = SCREEN_HEIGHT // 2 - info_h // 2
+        draw_text(info_text, font, (255, 255, 0), info_x, info_y)
 
-        draw_text(info_text, font, (255,255,0), info_x, info_y)
-
-        # Sau 1 giây thì chuyển sang Play
         if pygame.time.get_ticks() - selection_time > 1000:
             start_intro = False
-            start_game  = True
+            start_game = True
 
-    # 2) Nếu chưa vào Play và không phải INTRO thì đang ở MENU
     elif not start_game:
         screen.fill(BG)
-        # Title căn giữa
-                # 1) CHOOSE ALGORITHM: nằm trên nút Beam Search, căn giữa ngang với button
+        # Vẽ tiêu đề "CHOOSE ALGORITHM:" phía trên các cột, căn giữa màn hình
         title_text = "CHOOSE ALGORITHM:"
-        # đo kích thước text
         title_w, title_h = font.size(title_text)
-        # x = tâm button – một nửa chiều rộng text
-        title_x = start_beamsearch_button.rect.centerx - title_w // 2
-        # y = tọa độ y của button – chiều cao text – khoảng cách mong muốn (vd 10px)
-        title_y = start_beamsearch_button.rect.y - title_h - 10
-
-        # vẽ bằng draw_text
+        title_x = (SCREEN_WIDTH - title_w) // 2
+        title_y = start_y - title_h - 20  # 20px phía trên hàng đầu tiên
         draw_text(title_text, font, WHITE, title_x, title_y)
 
         # Vẽ các nút
@@ -732,6 +744,18 @@ while run:
             selected_algorithm = "A*"
             start_intro = True
             selection_time = pygame.time.get_ticks()
+        if start_backtracking_button.draw(screen):
+            selected_algorithm = "Backtracking"
+            start_intro = True
+            selection_time = pygame.time.get_ticks()
+        if start_ucssearch_button.draw(screen):
+            selected_algorithm = "UCS Search"
+            start_intro = True
+            selection_time = pygame.time.get_ticks()
+        if start_idastar_button.draw(screen):
+            selected_algorithm = "IDA*"
+            start_intro = True
+            selection_time = pygame.time.get_ticks()
         if exit_button.draw(screen):
             run = False
 
@@ -745,54 +769,35 @@ while run:
         draw_text("GRENADES: ", font, WHITE, 10, 60)
         for x in range(player.grenades):
             screen.blit(grenade_img, (135 + (x * 15), 60))
-        # Lấy số lượng enemy hiện tại từ group
         current_enemy_count = len(enemy_group)
         draw_text(f"ENEMIES: {current_enemy_count}", font, WHITE, 10, 85)
-        # Lấy rect của nút Exit in-game
         exit_rect = in_game_exit_btn.rect
-
-        # Các thông số khoảng cách
-        margin    = 0    # khoảng cách giữa dòng dưới và đỉnh nút
-        line_spc   = 2   # khoảng cách giữa 2 dòng text
-
-        # Text dòng 1
+        margin = 0
+        line_spc = 2
         label_text = " Algorithm:"
-        lw, lh     = font.size(label_text)
-
-        # Text dòng 2
+        lw, lh = font.size(label_text)
         name_text = selected_algorithm
-        nw, nh    = font.size(name_text)
-
-        # Tính tổng chiều cao của 2 dòng
+        nw, nh = font.size(name_text)
         total_h = lh + line_spc + nh
-        # Tính y bắt đầu để 2 dòng này nằm ngay phía trên nút Exit
         start_y = exit_rect.y - margin - total_h
-
-        # Vẽ dòng 1 (Algorithm:)
-        lx = exit_rect.x + (exit_rect.width  - lw) // 2
+        lx = exit_rect.x + (exit_rect.width - lw) // 2
         ly = start_y
         draw_text(label_text, small_font, WHITE, lx, ly)
-
-        # Vẽ dòng 2 (tên thuật toán)
-        nx = exit_rect.x + (exit_rect.width  - nw) // 2
+        nx = exit_rect.x + (exit_rect.width - nw) // 2
         ny = ly + lh + line_spc
         draw_text(name_text, small_font, WHITE, nx, ny)
-        # 3) Vẽ và xử lý nút Exit in-game
         if in_game_exit_btn.draw(screen):
             start_game = False
             start_intro = False
             selected_algorithm = None
-            level = 1  # Reset level về 1
+            level = 1
             bg_scroll = 0
-
-            # Reset level data
             world_data = reset_level()
             with open(f"level{level}_data.csv", newline="") as csvfile:
                 reader = csv.reader(csvfile, delimiter=",")
                 for y, row in enumerate(reader):
                     for x, tile in enumerate(row):
                         world_data[y][x] = int(tile)
-
             world = World()
             player, health_bar = world.process_data(world_data, level)
         player.update()
@@ -846,7 +851,7 @@ while run:
 
             if level_complete:
                 start_intro = True
-                level += 1  # Tăng level để chuyển sang level tiếp theo
+                level += 1
                 if level <= MAX_LEVELS:
                     bg_scroll = 0
                     world_data = reset_level()
@@ -858,7 +863,6 @@ while run:
                     world = World()
                     player, health_bar = world.process_data(world_data, level)
                 else:
-                    # Nếu vượt quá số level tối đa, hiển thị màn hình chiến thắng
                     draw_text("YOU WIN!", font, WHITE, SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2)
                     pygame.display.update()
                     pygame.time.wait(2000)
