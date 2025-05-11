@@ -280,7 +280,8 @@ class Soldier(pygame.sprite.Sprite):
             elif selected_algorithm == "BFS":
                 path = bfs(start, goal, world_data)
             elif selected_algorithm == "A*":
-                path = and_or_search(start, goal, world_data)
+                #path = simulated_annealing_path_search(start, goal, world_data)
+                path = ucs_search(start,goal,world_data)
             else:
                 path = None  # Trường hợp không có thuật toán nào được chọn
 
