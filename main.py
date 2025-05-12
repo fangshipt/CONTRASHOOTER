@@ -54,7 +54,6 @@ stage_sceneries = {
 }
 
 # Tải hình ảnh nút
-start_img = pygame.image.load("img/start_btn.png").convert_alpha()
 exit_img = pygame.image.load("img/exit_btn.png").convert_alpha()
 restart_img = pygame.image.load("img/restart_btn.png").convert_alpha()
 beamsearch_img = pygame.image.load("img/start_BeamSearch_btn.png").convert_alpha()
