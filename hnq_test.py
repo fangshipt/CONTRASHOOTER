@@ -16,20 +16,21 @@ def read_level_data(filename):
         for row in reader:
             grid.append([int(x) for x in row])
     return grid
-
+"""
 def is_safe(x, y, grid):
-    """
+    
     Kiểm tra ô (x,y) có an toàn để đi qua hay không.
     An toàn nếu:
       - Giá trị ô không phải là nước (9,10)
       - Nếu ô nằm ở hàng cuối (y == ROWS-1), thì giá trị không được là -1 (pit)
-    """
+    
     val = grid[y][x]
     if val in (9, 10):
         return False
     if y == ROWS - 1 and val == -1:
         return False
     return True
+    """
 
 def a_star(start, goal, grid):
     """
