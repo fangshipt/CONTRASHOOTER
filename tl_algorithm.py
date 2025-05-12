@@ -449,7 +449,7 @@ def ida_star_search(start, goal, grid):
         active_bound = status
 
 #### UCS
-def is_safe(x, y, grid):
+def is_safe_ucs(x, y, grid):
     if not grid: return False
     actual_rows = len(grid)
     if actual_rows == 0: return False
@@ -460,11 +460,7 @@ def is_safe(x, y, grid):
     if val in (9, 10): return False 
     if y == actual_rows - 1 and val == -1: return False 
     return True
-def is_safe_for_ucs_intermediate_jump_check(x, y, grid): 
-    val = grid[y][x]
-    if val in (9, 10, -1): 
-        return False 
-    return True 
+
 def ucs_search(start, goal, grid):
     def get_neighbors_with_cost_ucs(node):
         x, y = node
@@ -476,13 +472,13 @@ def ucs_search(start, goal, grid):
                     break 
                 cost = dist 
                 if dist <= 1: 
-                    if is_safe(candidate_x, y, grid):
+                    if is_safe_ucs(candidate_x, y, grid):
                         neighbors_data.append(((candidate_x, y), cost))
                 else: 
                     jump_possible = True
                     for step in range(0, dist): 
                         intermediate_x = x + dx_direction * step
-                        if is_safe(intermediate_x, y, grid): 
+                        if is_safe_ucs(intermediate_x, y, grid): 
                             jump_possible = False; break
                     if jump_possible: 
                         neighbors_data.append(((candidate_x, y), cost))
@@ -492,18 +488,18 @@ def ucs_search(start, goal, grid):
                 if not (0 <= candidate_y <= rows + 1): break
                 cost = dist
                 if dist == 2: 
-                    if is_safe(x, candidate_y, grid):
+                    if is_safe_ucs(x, candidate_y, grid):
                         neighbors_data.append(((x, candidate_y), cost))
                 else: 
                     jump_possible = True
                     for step in range(1, dist):
                         intermediate_y = y + dy_direction * step
-                        if is_safe(x, intermediate_y, grid): 
+                        if is_safe_ucs(x, intermediate_y, grid): 
                             jump_possible = False; break
-                    if jump_possible and is_safe(x, candidate_y, grid): 
+                    if jump_possible and is_safe_ucs(x, candidate_y, grid): 
                         neighbors_data.append(((x, candidate_y), cost))
         return neighbors_data
-    if not is_safe(start[0], start[1], grid) or not is_safe(goal[0], goal[1], grid):
+    if not is_safe_ucs(start[0], start[1], grid) or not is_safe_ucs(goal[0], goal[1], grid):
         return None 
     open_set_pq = [] 
     heapq.heappush(open_set_pq, (0, start))

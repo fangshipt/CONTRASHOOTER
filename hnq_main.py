@@ -7,7 +7,7 @@ import csv
 import button
 import math
 from tl_setting import *
-from tl_algorithm import *
+from hnq_test import *
 
 mixer.init()
 pygame.init()
