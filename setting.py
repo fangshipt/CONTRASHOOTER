@@ -13,7 +13,7 @@ tile_types = 21
 max_levels = 2
 screen_scroll = 0
 bg_scroll = 0
-level = 2 
+level = 1
 
 # Trạng thái trò chơi
 start_game  = False    
