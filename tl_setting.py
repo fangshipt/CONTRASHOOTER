@@ -16,14 +16,13 @@ level = 1
 start_game  = False    
 start_intro = False   
 selection_time = 0
-# selected_algorithm = None # This is initialized to None where it's first used or can be here
 move_left = False
 move_right = False
 shoot = False
 grenade = False
 grenade_thrown = False
 # Biến lưu thuật toán được chọn
-selected_algorithm = None # Explicitly initialized here
+selected_algorithm = None 
 
 # Định nghĩa màu sắc
 bg = (144, 201, 120)
@@ -31,8 +30,9 @@ red = (255, 0, 0)
 white = (255, 255, 255)
 green = (0, 255, 0)
 black = (0, 0, 0)
-pink = (235, 65, 54) # For death fade
+pink = (235, 65, 54) 
 
 # Khoảng cách giữa các nút 
-spacing        = 20 # Vertical spacing between menu buttons
-exit_spacing   = 40 # Extra spacing before the exit button in menu
+spacing        = 20 
+exit_spacing   = 40 
+

@@ -45,7 +45,7 @@ stage_sceneries = {
         "pine1": pine1_level1_img,
         "pine2": pine2_level1_img
     },
-    "level2_up": {
+    "level2": {
         "sky": sky_level2_img,
         "mountain": mountain_level2_img,
         "pine1": pine1_level2_img,
@@ -60,6 +60,9 @@ restart_img = pygame.image.load("img/restart_btn.png").convert_alpha()
 beamsearch_img = pygame.image.load("img/start_BeamSearch_btn.png").convert_alpha()
 bfs_img = pygame.image.load("img/start_BFS_btn.png").convert_alpha()
 astar_img = pygame.image.load("img/start_AStar_btn.png").convert_alpha()
+backtracking_img = pygame.image.load("img/start_Backtracking_btn.png").convert_alpha()
+ucssearch_img = pygame.image.load("img/start_UCSSearch_btn.png").convert_alpha()
+idastar_img = pygame.image.load("img/start_IDAStar_btn.png").convert_alpha()
 
 # Tải hình ảnh ô (tile)
 tile_graphics_list = []
@@ -91,7 +94,7 @@ def draw_text(text_content, font, text_color, x, y):
 # Vẽ nền
 def render_stage_scenery():
     game_window.fill(bg)
-    bg_set = stage_sceneries["level2_up"] if level >= 2 else stage_sceneries["level1"]
+    bg_set = stage_sceneries["level2"] if level >= 2 else stage_sceneries["level1"]
     width = bg_set["sky"].get_width()
     for x in range(5):
         game_window.blit(bg_set["sky"], ((x * width) - bg_scroll * 0.5, 0))
@@ -253,6 +256,12 @@ class GameCharacter(pygame.sprite.Sprite):
                 path = bfs(start, goal, world_data)
             elif selected_algorithm == "A*":
                 path = a_star(start, goal, world_data)
+            elif selected_algorithm == "Backtracking":
+                path = backtracking_search(start, goal, world_data)
+            elif selected_algorithm == "UCS Search":
+                path = ucs_search(start, goal, world_data)
+            elif selected_algorithm == "IDA*":
+                path = ida_star_search(start, goal, world_data)
             else:
                 path = None 
 
@@ -561,35 +570,86 @@ class ScreenTransitionEffect():
 intro_fade = ScreenTransitionEffect(1, black, 4)
 death_fade = ScreenTransitionEffect(2, pink, 4)
 restart_button = button.Button(screen_width // 2 - 90, screen_height // 2 - 50, restart_img, 1)
-button_width      = beamsearch_img.get_width()
+################
+'''button_width      = beamsearch_img.get_width()
 button_height      = beamsearch_img.get_height()
 exit_button_width     = exit_img.get_width()
-exit_button_height     = exit_img.get_height()
+exit_button_height     = exit_img.get_height()'''
+column_spacing = 50  
+row_spacing = 20     
+exit_spacing = 40    
+
+# Lấy kích thước của các nút
+beam_w = beamsearch_img.get_width()
+beam_h = beamsearch_img.get_height()
+bfs_w = bfs_img.get_width()
+bfs_h = bfs_img.get_height()
+astar_w = astar_img.get_width()
+astar_h = astar_img.get_height()
+backtracking_w = backtracking_img.get_width()
+backtracking_h = backtracking_img.get_height()
+ucssearch_w = ucssearch_img.get_width()
+ucssearch_h = ucssearch_img.get_height()
+idastar_w = idastar_img.get_width()
+idastar_h = idastar_img.get_height()
+exit_w = exit_img.get_width()
+exit_h = exit_img.get_height()
+
+
+column1_width = max(beam_w, bfs_w)
+column2_width = max(astar_w, backtracking_w)
+column3_width = max(ucssearch_w, idastar_w)
+
+
+total_width = column1_width + column2_width + column3_width + 2 * column_spacing
+
+
+start_x = (screen_width - total_width) // 2
+
+# Tính chiều cao của hàng (dựa trên nút cao nhất trong mỗi hàng)
+row1_height = max(beam_h, astar_h, ucssearch_h)
+row2_height = max(bfs_h, backtracking_h, idastar_h)
+#####
 group_height = (
-    3 * button_height           
-  + 2 * spacing         
-  + exit_spacing        
-  + exit_button_height             
+   row1_height + row2_height +  
+    row_spacing +             
+    exit_spacing +              
+    exit_h              
 )
 start_y = (screen_height - group_height) // 2
-beam_search_button_x   = (screen_width - button_width)  // 2
-bfs_button_x    = beam_search_button_x
-astar_button_x  = beam_search_button_x
-exit_x   = (screen_width - exit_button_width) // 2
+
+column1_x = start_x
+column2_x = column1_x + column1_width + column_spacing
+column3_x = column2_x + column2_width + column_spacing
+
+# Tọa độ x cho từng nút (căn giữa trong cột của nó)
+beam_x = column1_x + (column1_width - beam_w) // 2
+bfs_x = column1_x + (column1_width - bfs_w) // 2
+astar_x = column2_x + (column2_width - astar_w) // 2
+backtracking_x = column2_x + (column2_width - backtracking_w) // 2
+ucssearch_x = column3_x + (column3_width - ucssearch_w) // 2
+idastar_x = column3_x + (column3_width - idastar_w) // 2
+exit_x = (screen_width - exit_w) // 2
+
+# Tọa độ y cho các hàng
+row1_y = start_y
+row2_y = row1_y + row1_height + row_spacing
+exit_y = row2_y + row2_height + exit_spacing
+
+# Khởi tạo các nút
+start_beamsearch_button = button.Button(beam_x, row1_y, beamsearch_img, 1)
+start_bfs_button = button.Button(bfs_x, row2_y, bfs_img, 1)
+start_astar_button = button.Button(astar_x, row1_y, astar_img, 1)
+start_backtracking_button = button.Button(backtracking_x, row2_y, backtracking_img, 1)
+start_ucssearch_button = button.Button(ucssearch_x, row1_y, ucssearch_img, 1)
+start_idastar_button = button.Button(idastar_x, row2_y, idastar_img, 1)
+exit_button = button.Button(exit_x, exit_y, exit_img, 1)
+
+
 menu_exit_button_graphic = exit_img
 in_game_exit_scale = 0.5
 ingame_exit_button_graphic = pygame.transform.rotozoom(menu_exit_button_graphic, 0, in_game_exit_scale)
-
 # Khởi tạo 
-start_beamsearch_button = button.Button(beam_search_button_x,  start_y,                            beamsearch_img, 1)
-start_bfs_button        = button.Button(bfs_button_x,   start_y + (button_height + spacing)*1,     bfs_img,         1)
-start_astar_button      = button.Button(astar_button_x, start_y + (button_height + spacing)*2,     astar_img,       1)
-exit_button = button.Button(
-    screen_width//2 - menu_exit_button_graphic.get_width()//2,
-    start_y + 3*(button_height+spacing) + exit_spacing,
-    menu_exit_button_graphic,
-    1
-)
 in_game_exit_btn = button.Button(
     screen_width - ingame_exit_button_graphic.get_width() - 10,  
     60,                                            
@@ -611,7 +671,7 @@ for row in range(rows):
     r = [-1] * cols
     world_data.append(r)
 
-with open(f"level{level}_data.csv", newline="") as csvfile:
+with open(f"level{level}.csv", newline="") as csvfile:
     reader = csv.reader(csvfile, delimiter=",")
     for y, row in enumerate(reader):
         for x, tile in enumerate(row):
@@ -641,8 +701,8 @@ while run:
         game_window.fill(bg)
         menu_title_content = "CHOOSE ALGORITHM:"
         title_w, title_h = font.size(menu_title_content)
-        title_x = start_beamsearch_button.rect.centerx - title_w // 2
-        title_y = start_beamsearch_button.rect.y - title_h - 10
+        title_x = (screen_width - title_w) // 2
+        title_y = start_y - title_h - 20
         draw_text(menu_title_content, font, white, title_x, title_y)
 
         # Vẽ các nút
@@ -656,6 +716,18 @@ while run:
             selection_time = pygame.time.get_ticks()
         if start_astar_button.draw(game_window):
             selected_algorithm = "A*"
+            start_intro = True
+            selection_time = pygame.time.get_ticks()
+        if start_backtracking_button.draw(game_window):
+            selected_algorithm = "Backtracking"
+            start_intro = True
+            selection_time = pygame.time.get_ticks()
+        if start_ucssearch_button.draw(game_window):
+            selected_algorithm = "UCS Search"
+            start_intro = True
+            selection_time = pygame.time.get_ticks()
+        if start_idastar_button.draw(game_window):
+            selected_algorithm = "IDA*"
             start_intro = True
             selection_time = pygame.time.get_ticks()
         if exit_button.draw(game_window):
@@ -697,7 +769,7 @@ while run:
 
             # Đặt lại level
             world_data = reset_level()
-            with open(f"level{level}_data.csv", newline="") as csvfile:
+            with open(f"level{level}.csv", newline="") as csvfile:
                 reader = csv.reader(csvfile, delimiter=",")
                 for y, row in enumerate(reader):
                     for x, tile in enumerate(row):
@@ -754,7 +826,7 @@ while run:
                 if level <= max_levels:
                     bg_scroll = 0
                     world_data = reset_level()
-                    with open(f"level{level}_data.csv", newline="") as csvfile:
+                    with open(f"level{level}.csv", newline="") as csvfile:
                         reader = csv.reader(csvfile, delimiter=",")
                         for y, row in enumerate(reader):
                             for x, tile in enumerate(row):
@@ -775,7 +847,7 @@ while run:
                     start_intro = True
                     bg_scroll = 0
                     world_data = reset_level()
-                    with open(f"level{level}_data.csv", newline="") as csvfile:
+                    with open(f"level{level}.csv", newline="") as csvfile:
                         reader = csv.reader(csvfile, delimiter=",")
                         for y, row in enumerate(reader):
                             for x, tile in enumerate(row):
