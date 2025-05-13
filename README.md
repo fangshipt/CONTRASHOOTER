@@ -58,7 +58,7 @@ Triển khai và so sánh bốn thuật toán tìm đường gồm **BFS**, **A\
 ## SO SÁNH CÁC THUẬT TOÁN
 Để đánh giá hiệu quả của bốn thuật toán tìm đường **BFS**, **A\***, **Beam Search** và **Backtracking** chúng ta sẽ xem xét cách chúng hoạt động trên hai cấp độ của trò chơi: `level1.csv` và `level1.csv`. Mỗi cấp độ có đặc điểm khác nhau về độ phức tạp của bản đồ, từ đó giúp làm rõ ưu và nhược điểm của từng thuật toán trong môi trường game thực tế.
 
-### GIF cho level 1
+### ✨ GIF cho level 1
 - **BFS (Breadth-First Search)**
 
 ![BFS trên Level 1](assets/BFS_Level1.gif)
@@ -76,7 +76,7 @@ Triển khai và so sánh bốn thuật toán tìm đường gồm **BFS**, **A\
 ![Backtracking trên Level 1](assets/Backtracking_Level1.gif)
 
 
-### GIF cho level 2
+### ✨ GIF cho level 2
 - **BFS (Breadth-First Search)**
 
 ![BFS trên Level 2](assets/BFS_Level2.gif)
@@ -92,3 +92,30 @@ Triển khai và so sánh bốn thuật toán tìm đường gồm **BFS**, **A\
 - **BACKTRACKING**
 
 ![Backtracking trên Level 1](assets/Backtracking_Level2.gif)
+
+### ✨ Bảng đánh giá thực nghiệm
+
+| Thuật toán   | Thời gian tìm kiếm                       | Tính tối ưu                                                                            | Sử dụng bộ nhớ      | Tính đầy đủ                                        | Hành vi của kẻ địch                                                                                                                                               |
+|--------------|------------------------------------------|----------------------------------------------------------------------------------------|---------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| A*           | Trung bình, có thể gây trễ trong level 2 | Đảm bảo tìm được đường đi tốt nhất                                                     | Trung bình đến cao  | Có                                                 | Di chuyển hiệu quả, tìm đường ngắn nhất                                                                                                                           |
+| BFS          | Trung bình, có thể gây trễ trong level 2 | Tìm được đường đi rất tốt, gần tối ưu                                                  | Cao                 | Có                                                 | Di chuyển không có định hướng rõ ràng, mở rộng tìm kiếm đều các phía. Đảm bảo đường đi ít bước nhất nhưng thiếu sự thông minh với cấu trúc map phức tạp ở level 2 |
+| Beam Search  | Ngắn                                     | Đường đi có thể không tốt hoặc không hiệu quả nhưng vẫn đủ đẻ kẻ địch di chuyển hợp lý | Thấp đến trung bình | Không                                              | Phản ứng nhanh. Đường đi khá hợp lý nhúng không đảm bảo tối ưu, có thể bỏ lỡ đường đi tốt hơn                                                                     |
+| Backtracking | Cao đến rất cao                          | Đường đi có thể không tốt                                                              | Trung bình đến cao  | Có thể tìm thấy đường đi nằm trong giới hạn đã đặt | Cho hiệu suất ổn định và đường đi hợp lí. Thiếu sự thông minh với cấu trúc map phức tạp ở level 2                                                                 |
+
+Dựa trên đặc điểm của trò chơi và phân tích các thuật toán, sắp xếp mức độ phù hợp và hiệu quả của thuật toán khi áp dụng vào việc điều khiển kẻ địch trong game theo thứ tự như sau:
+- **Beam Search**: Cân bằng tốt nhất giữa tốc độ tìm kiếm và chất lượng đường đi. Phản ứng nhanh của kẻ địch và hành vi di chuyển khá tự nhiên. 
+
+- **A\***: Tìm đường đi tối ưu nhất với hành vi di chuyển hiệu quả. Có thể hơi chậm hơn Beam Search trên map có cấu trúc phức tạp như level 2.
+
+- **Backtracking Search**: Cho hiệu suất ổn định và đường đi hợp lý, tuy nhiên hiệu năng có thể giảm trên map phức tạp như level 2. 
+
+- **BFS**: Đơn giản, đảm bảo tìm đường ít bước nhất. Tuy nhiên, khám phá không định hướng, có thể chậm và tốn bộ nhớ hơn.
+---
+
+## Kết luận
+Qua việc triển khai và so sánh bốn thuật toán tìm đường trong **CONTRASHOOTER**:
+- **Beam Search** là lựa chọn tốt nhất cho môi trường game thời gian thực nhờ tốc độ nhanh và hành vi tự nhiên.
+
+- **A\*** phù hợp khi cần đường đi tối ưu, nhưng có thể chậm hơn trên bản đồ phức tạp.
+
+- **BFS** và **Backtracking** phù hợp cho các tình huống đơn giản hoặc khi cần đảm bảo tính đầy đủ, nhưng không tối ưu cho hiệu suất.
