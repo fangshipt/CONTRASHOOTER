@@ -112,7 +112,7 @@ Dựa trên đặc điểm của trò chơi và phân tích các thuật toán, 
 - **BFS**: Đơn giản, đảm bảo tìm đường ít bước nhất. Tuy nhiên, khám phá không định hướng, có thể chậm và tốn bộ nhớ hơn.
 ---
 
-## Kết luận
+## KẾT LUẬN
 Qua việc triển khai và so sánh bốn thuật toán tìm đường trong **CONTRASHOOTER**:
 - **Beam Search** là lựa chọn tốt nhất cho môi trường game thời gian thực nhờ tốc độ nhanh và hành vi tự nhiên.
 
